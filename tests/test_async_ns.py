@@ -103,4 +103,3 @@ class TestAsyncNS:
             assert conn.state == 'connected'
 
         assert conn.state == 'disconnected'
-

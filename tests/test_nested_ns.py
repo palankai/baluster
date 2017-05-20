@@ -1,6 +1,4 @@
-import pytest
-
-from ns.base import NS, make, enter
+from ns.base import NS, make
 
 
 class CompositeRoot(NS):
