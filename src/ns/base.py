@@ -2,8 +2,8 @@ import asyncio
 import re
 from collections import defaultdict
 from contextlib import contextmanager
-from inspect import isclass, isawaitable
-from functools import wraps, partial
+from inspect import isclass
+from functools import partial
 
 
 class Maker:
@@ -106,7 +106,9 @@ def make(func=None, **kwargs):
 
 class BaseNS:
 
-    def __init__(self, parent=None, name=None, _vars=None, _alias=None, _handlers=None):
+    def __init__(
+        self, parent=None, name=None, _vars=None, _alias=None, _handlers=None
+    ):
         self._parent = parent
         if parent is not None:
             self._root = parent._root
