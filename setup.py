@@ -24,7 +24,7 @@ if __name__ == '__main__':
         version=VERSION,
         license='MIT',
         description="Provides hierarchical factory",
-        long_description=read('README.md'),
+        long_description=read('README.rst'),
         url='https://gitlab.com/palankai/factory_tree',
         classifiers=[
             'Development Status :: 3 - Alpha',
