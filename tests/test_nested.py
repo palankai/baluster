@@ -1,26 +1,26 @@
-from ns.base import NS, make
+from baluster import Holder, make
 
 
-class CompositeRoot(NS):
+class CompositeRoot(Holder):
 
     @make
     def value(self, root):
         return 2
 
-    class subns(NS):
+    class subns(Holder):
 
         @make
         def value(self, root):
             return 1
 
-    class subns_2(NS):
+    class subns_2(Holder):
 
         @make(alias='subns_2_value')
         def value(self, root):
             return root.subns.value + 3
 
 
-class TestNestedNS:
+class TestNested:
 
     def test_sanity(self):
         obj = CompositeRoot()

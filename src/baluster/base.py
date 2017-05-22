@@ -104,7 +104,7 @@ def make(func=None, **kwargs):
     return Maker(func, **kwargs)
 
 
-class BaseNS:
+class BaseHolder:
 
     def __init__(
         self, parent=None, name=None, _vars=None, _alias=None, _handlers=None
@@ -171,7 +171,6 @@ class BaseNS:
         _vars = dict()
         for key, value in self._vars.items():
             for name in names:
-                print('name ?= key', name, key)
                 if re.match('^{}$'.format(name), key):
                     _vars[key] = value
         return self.__class__(
@@ -179,7 +178,7 @@ class BaseNS:
         )
 
 
-class NSType(type):
+class HolderType(type):
 
     def __new__(cls, name, bases, defined_members):
         makers = []
@@ -189,7 +188,7 @@ class NSType(type):
         for k, v in defined_members.items():
             if isinstance(v, Maker):
                 makers.append(v)
-            if isclass(v) and issubclass(v, BaseNS):
+            if isclass(v) and issubclass(v, BaseHolder):
                 nested.append((k, v))
             members[k] = v
 
@@ -198,20 +197,19 @@ class NSType(type):
         return super().__new__(cls, name, bases, members)
 
 
-class NS(BaseNS, metaclass=NSType):
+class Holder(BaseHolder, metaclass=HolderType):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name, nested in self._nested:
-            print(name, nested)
             setattr(self, name, nested(parent=self, name=name))
         for maker in self._makers:
             maker.setup(self)
 
 
 @contextmanager
-def enter(ns, finish='close', **kwargs):
+def enter(holder, finish='close', **kwargs):
     try:
-        yield ns
+        yield holder
     finally:
-        ns(finish, **kwargs)
+        holder(finish, **kwargs)

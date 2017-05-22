@@ -1,9 +1,9 @@
 import pytest
 
-from ns.base import NS, make, enter
+from baluster import Holder, make, enter
 
 
-class CompositeRootCase(NS):
+class CompositeRootCase(Holder):
 
     _value = 0
     _closed = False
@@ -38,7 +38,7 @@ class CompositeRootCase(NS):
         return 'as alias'
 
 
-class TestNS:
+class TestHolder:
 
     def test_sanity(self):
         obj = CompositeRootCase()

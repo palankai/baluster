@@ -1,5 +1,5 @@
 import pytest
-from ns.base import NS, make
+from baluster import Holder, make
 
 
 class SampleAsyncConnection:
@@ -28,7 +28,7 @@ class SampleAsyncConnection:
         return self
 
 
-class SampleAsyncNS(NS):
+class SampleAsync(Holder):
 
     @make
     def connection(self, root):
@@ -46,11 +46,11 @@ class SampleAsyncNS(NS):
         await conn.disconnect()
 
 
-class TestAsyncNS:
+class TestAsync:
 
     @pytest.mark.asyncio
     async def test_top_level_access(self):
-        obj = SampleAsyncNS()
+        obj = SampleAsync()
         conn = obj.connection
 
         assert conn.state is None
@@ -63,7 +63,7 @@ class TestAsyncNS:
 
     @pytest.mark.asyncio
     async def test_coroutine_access(self):
-        obj = SampleAsyncNS()
+        obj = SampleAsync()
 
         conn = await obj.connect
         assert conn.state == 'connected'
@@ -73,7 +73,7 @@ class TestAsyncNS:
 
     @pytest.mark.asyncio
     async def test_coroutine_access_by_alias(self):
-        obj = SampleAsyncNS()
+        obj = SampleAsync()
 
         conn = await obj['conn']
         assert conn.state == 'connected'
@@ -83,7 +83,7 @@ class TestAsyncNS:
 
     @pytest.mark.asyncio
     async def test_as_context_manager(self):
-        obj = SampleAsyncNS()
+        obj = SampleAsync()
         conn = obj.connection
         assert conn.state is None
 
@@ -94,7 +94,7 @@ class TestAsyncNS:
 
     @pytest.mark.asyncio
     async def test_hooks(self):
-        obj = SampleAsyncNS()
+        obj = SampleAsync()
 
         async with obj:
             conn = obj.connection
