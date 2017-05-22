@@ -1,4 +1,4 @@
-import asyncio
+from asyncio import iscoroutinefunction, coroutine
 import re
 from collections import defaultdict
 from inspect import isclass
@@ -7,15 +7,16 @@ from functools import partial
 
 class ValueStoreProxy:
 
-    def __init__(self, name, instance):
+    def __init__(self, name, instance, func):
         self._instance = instance
         self._root = instance._root
         self._name = name
         self._key = instance._get_member_name(name)
+        self._func = partial(func, self._instance, self._root)
 
     @property
-    def root(self):
-        return self._root
+    def func(self):
+        return self._func
 
     def get(self):
         return self._root._get(self._key)
@@ -48,12 +49,27 @@ class Maker:
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        if asyncio.iscoroutinefunction(self._func):
-            return self._async_get(instance)
-        return self._get(instance)
+        getter = self._is_async and self._async_get or self._get
+        return getter(self._get_proxy(instance))
+
+    def _get(self, proxy):
+        if proxy.has():
+            return proxy.get()
+        value = proxy.func()
+        if self._cache:
+            proxy.save(value)
+        return value
+
+    async def _async_get(self, proxy):
+        if proxy.has():
+            return proxy.get()
+        value = await proxy.func()
+        if self._cache:
+            proxy.save(value)
+        return value
 
     def __set__(self, instance, value):
-        proxy = ValueStoreProxy(self._name, instance)
+        proxy = self._get_proxy(instance)
         if proxy.has():
             raise AttributeError(
                 'The value `{name}` has already been set'.format(
@@ -68,6 +84,9 @@ class Maker:
             )
         proxy.save(value)
 
+    def _get_proxy(self, instance):
+        return ValueStoreProxy(self._name, instance, self._func)
+
     def __delete__(self, instance):
         raise AttributeError('Attribute cannot be deleted')
 
@@ -75,23 +94,9 @@ class Maker:
         self._name = name
         self._owner = owner
 
-    def _get(self, instance):
-        proxy = ValueStoreProxy(self._name, instance)
-        if proxy.has():
-            return proxy.get()
-        value = self._func(instance, proxy.root)
-        if self._cache:
-            proxy.save(value)
-        return value
-
-    async def _async_get(self, instance):
-        proxy = ValueStoreProxy(self._name, instance)
-        if proxy.has():
-            return proxy.get()
-        value = await self._func(instance, proxy.root)
-        if self._cache:
-            proxy.save(value)
-        return value
+    @property
+    def _is_async(self):
+        return iscoroutinefunction(self._func)
 
     def hook(self, name):
         def inner(f):
@@ -100,22 +105,26 @@ class Maker:
         return inner
 
     def setup(self, instance):
+        self._setup_alias(instance)
+        self._setup_handlers(instance)
+
+    def _setup_alias(self, instance):
+        if self._alias is None:
+            return
+        proxy = self._get_proxy(instance)
+        if self._is_async:
+            _getter = coroutine(partial(self._async_get, proxy))
+        else:
+            _getter = partial(self._get, proxy)
+        instance._root._set_alias(self._alias, _getter)
+
+    def _setup_handlers(self, instance):
         root = instance._root
-        if self._alias is not None:
-            if asyncio.iscoroutinefunction(self._func):
-                root._set_alias(
-                    self._alias,
-                    asyncio.coroutine(partial(self._async_get, instance))
-                )
-            else:
-                root._set_alias(self._alias, partial(self._get, instance))
         for name, handler in self._hooks:
-            if asyncio.iscoroutinefunction(handler):
-                async def f(**kwargs):
-                    return await handler(instance, root, **kwargs)
-                root._add_handler(name, f)
-            else:
-                root._add_handler(name, partial(handler, instance, root))
+            _handler = partial(handler, instance, root)
+            if iscoroutinefunction(handler):
+                _handler = coroutine(_handler)
+            root._add_handler(name, _handler)
 
 
 def make(func=None, **kwargs):
@@ -185,7 +194,7 @@ class BaseHolder:
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         for handler in self._handlers['close']:
-            if asyncio.iscoroutinefunction(handler):
+            if iscoroutinefunction(handler):
                 await handler()
             else:
                 handler()
