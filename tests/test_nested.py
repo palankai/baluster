@@ -21,7 +21,6 @@ class CompositeRoot(Holder):
 
     class subns_2(Holder):
 
-
         @make(alias='subns_2_value')
         def value(self, root):
             return root.subns.value + 3
@@ -58,4 +57,3 @@ class TestNested:
 
         assert copyA.subns_2.value == 4
         assert copyB.subns_2.value == 6
-

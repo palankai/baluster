@@ -162,6 +162,7 @@ class TestAsync:
             exception_raised = True
 
         assert obj._closed_resources is None
+        assert exception_raised is True
 
     @pytest.mark.asyncio
     async def test_closed_with_invoke(self):
@@ -178,3 +179,4 @@ class TestAsync:
             exception_raised = True
 
         assert obj._closed_resources == ['async', 'async', 'sync']
+        assert exception_raised is True

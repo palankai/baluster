@@ -73,6 +73,7 @@ class TestHolder:
             exception_raised = True
 
         assert obj._closed_resources is None
+        assert exception_raised is True
 
     def test_closed_with_invoke(self):
         obj = CompositeRootCase()
@@ -86,8 +87,9 @@ class TestHolder:
                 raise ZeroDivisionError()
         except ZeroDivisionError:
             exception_raised = True
+        assert exception_raised is True
 
-        assert obj._closed_resources == [2,2,1]
+        assert obj._closed_resources == [2, 2, 1]
 
     def test_alias(self):
         obj = CompositeRootCase()
@@ -160,7 +162,7 @@ class TestHolder:
             obj.resource_1
             obj.resource_2
             copy = obj.copy('resource_1')
-        assert obj._closed_resources == [2,1]
+        assert obj._closed_resources == [2, 1]
 
         with copy:
             pass
