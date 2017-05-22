@@ -1,1 +1,1 @@
-from .base import Holder, make                       # noqa
+from .base import Holder  # noqa
