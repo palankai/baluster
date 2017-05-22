@@ -8,7 +8,7 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 
-VERSION = '0.1'
+VERSION = '0.2'
 
 
 if __name__ == '__main__':
@@ -27,9 +27,8 @@ if __name__ == '__main__':
         long_description=read('README.rst'),
         url='https://gitlab.com/palankai/baluster',
         classifiers=[
-            'Development Status :: 3 - Alpha',
+            'Development Status :: 4 - Beta',
             'Intended Audience :: Developers',
-            'Intended Audience :: Science/Research',
             'License :: OSI Approved :: MIT License',
             'Natural Language :: English',
             'Programming Language :: Python :: 3.6',
