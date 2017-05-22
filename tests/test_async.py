@@ -83,12 +83,6 @@ class SampleAsync(Holder):
         conn.connect()
         return conn
 
-    @make
-    async def sync_connect(self, root):
-        conn = root.sync_connection
-        conn.connect()
-        return conn
-
     @sync_connection.hook('close')
     def sync_disconnect(self, root):
         conn = root.sync_connection
