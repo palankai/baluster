@@ -1,8 +1,8 @@
 from asyncio import iscoroutinefunction, coroutine
-import re
 from collections import defaultdict
-from inspect import isclass
 from functools import partial
+from inspect import isclass
+import re
 
 
 class ValueStoreProxy:
@@ -120,10 +120,6 @@ class Maker:
         instance._root._set_alias(self._alias, _getter)
 
 
-def make(func=None, **kwargs):
-    return Maker(func, **kwargs)
-
-
 class BaseHolder:
 
     def __init__(
@@ -221,6 +217,10 @@ class BaseHolder:
             _alias=_alias, _handlers=_handlers, _vars=_vars,
             _close_handlers=_close_handlers
         )
+
+    @staticmethod
+    def factory(func=None, **kwargs):
+        return Maker(func, **kwargs)
 
 
 class HolderType(type):

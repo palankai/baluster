@@ -1,6 +1,6 @@
 import pytest
 
-from baluster import Holder, make
+from baluster import Holder
 
 
 class CompositeRootCase(Holder):
@@ -10,28 +10,28 @@ class CompositeRootCase(Holder):
 
     _closed_resources = None
 
-    @make
+    @Holder.factory
     def value(self, root):
         return self._value
 
-    @make
+    @Holder.factory
     def value_plus_100(self, root):
         return self._value + 100
 
-    @make(cache=False)
+    @Holder.factory(cache=False)
     def value_no_cache(self, root):
         self._value += 1
         return self._value
 
-    @make(readonly=True)
+    @Holder.factory(readonly=True)
     def value_readonly(self, root):
         return self._value
 
-    @make(alias='alias')
+    @Holder.factory(alias='alias')
     def value_alias(self, root):
         return 'as alias'
 
-    @make
+    @Holder.factory
     def resource_1(self, root):
         return 1
 
@@ -41,7 +41,7 @@ class CompositeRootCase(Holder):
             self._closed_resources = []
         self._closed_resources.append(resource)
 
-    @make(cache=False)
+    @Holder.factory(cache=False)
     def resource_2(self, root):
         return 2
 
