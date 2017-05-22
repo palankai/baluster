@@ -25,7 +25,7 @@ if __name__ == '__main__':
         license='MIT',
         description="Provides hierarchical factory",
         long_description=read('README.rst'),
-        url='https://gitlab.com/palankai/factory_tree',
+        url='https://gitlab.com/palankai/baluster',
         classifiers=[
             'Development Status :: 3 - Alpha',
             'Intended Audience :: Developers',
