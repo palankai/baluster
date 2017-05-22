@@ -1,7 +1,6 @@
 import asyncio
 import re
 from collections import defaultdict
-from contextlib import contextmanager
 from inspect import isclass
 from functools import partial
 
@@ -174,6 +173,13 @@ class BaseHolder:
         for handler in self._handlers[name]:
             handler(**kwargs)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        for handler in self._handlers['close']:
+            handler()
+
     async def __aenter__(self):
         return self
 
@@ -224,11 +230,3 @@ class Holder(BaseHolder, metaclass=HolderType):
             setattr(self, name, nested(parent=self, name=name))
         for maker in self._makers:
             maker.setup(self)
-
-
-@contextmanager
-def enter(holder, finish='close', **kwargs):
-    try:
-        yield holder
-    finally:
-        holder(finish, **kwargs)

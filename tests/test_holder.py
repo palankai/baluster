@@ -1,6 +1,6 @@
 import pytest
 
-from baluster import Holder, make, enter
+from baluster import Holder, make
 
 
 class CompositeRootCase(Holder):
@@ -50,11 +50,16 @@ class TestHolder:
 
     def test_close(self):
         obj = CompositeRootCase()
+        exception_raised = False
 
-        with enter(obj):
-            pass
+        try:
+            with obj:
+                raise ZeroDivisionError()
+        except ZeroDivisionError:
+            exception_raised = True
 
         assert obj._closed is True
+        assert exception_raised is True
 
     def test_hooks(self):
         obj = CompositeRootCase()

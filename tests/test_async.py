@@ -141,16 +141,23 @@ class TestAsync:
     @pytest.mark.asyncio
     async def test_hooks(self):
         obj = SampleAsync()
+        exception_raised = False
 
-        async with obj:
-            conn = obj.connection
-            sync_conn = obj.sync_connection
-            assert conn.state is None
-            assert sync_conn.state is None
-            await conn.connect()
-            sync_conn.connect()
-            assert conn.state == 'connected'
-            assert sync_conn.state == 'connected'
+        try:
+            async with obj:
+                conn = obj.connection
+                sync_conn = obj.sync_connection
+                assert conn.state is None
+                assert sync_conn.state is None
+                await conn.connect()
+                sync_conn.connect()
+                assert conn.state == 'connected'
+                assert sync_conn.state == 'connected'
+
+                raise ZeroDivisionError()
+        except ZeroDivisionError:
+            exception_raised = True
 
         assert conn.state == 'disconnected'
         assert sync_conn.state == 'disconnected'
+        assert exception_raised is True
