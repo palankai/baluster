@@ -13,7 +13,7 @@ VERSION = '0.1'
 
 if __name__ == '__main__':
     setup(
-        name='Factory Tree',
+        name='Baluster',
         author='Csaba Palankai',
         author_email='csaba.palankai@gmail.com',
         packages=find_packages(
