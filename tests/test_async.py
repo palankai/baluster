@@ -52,8 +52,10 @@ class SampleSyncConnection:
 
 class SampleAsync(Holder):
 
+    _closed_resources = None
+
     @make
-    def connection(self, root):
+    def async_connection(self, root):
         return SampleAsyncConnection()
 
     @make
@@ -61,32 +63,42 @@ class SampleAsync(Holder):
         return SampleSyncConnection()
 
     @make(alias='conn')
-    async def connect(self, root):
-        conn = root.connection
+    async def async_connect(self, root):
+        conn = root.async_connection
         await conn.connect()
         return conn
 
     @make(cache=False)
-    async def fetch_some(self, root):
-        conn = root.connection
+    async def async_fetch_some(self, root):
+        conn = root.async_connection
         result = await conn.fetch_some()
         return result
 
-    @connection.hook('close')
-    async def disconnect(self, root):
-        conn = root.connection
-        await conn.disconnect()
-
     @make
-    async def sync_connect(self, root):
+    def sync_connect(self, root):
         conn = root.sync_connection
         conn.connect()
         return conn
 
-    @sync_connection.hook('close')
-    def sync_disconnect(self, root):
-        conn = root.sync_connection
-        conn.disconnect()
+    @make
+    def resource(self, root):
+        return 'sync'
+
+    @resource.close
+    def _close_resource(self, root, resource):
+        if self._closed_resources is None:
+            self._closed_resources = []
+        self._closed_resources.append(resource)
+
+    @make(cache=False)
+    async def async_resource(self, root):
+        return 'async'
+
+    @async_resource.close
+    async def _close_async_resource(self, root, resource):
+        if self._closed_resources is None:
+            self._closed_resources = []
+        self._closed_resources.append(resource)
 
 
 class TestAsync:
@@ -94,14 +106,14 @@ class TestAsync:
     @pytest.mark.asyncio
     async def test_top_level_access(self):
         obj = SampleAsync()
-        conn = obj.connection
+        conn = obj.async_connection
 
         assert conn.state is None
 
         await conn.connect()
         assert conn.state == 'connected'
 
-        res = await obj.fetch_some
+        res = await obj.async_fetch_some
         assert res == 'some'
 
         await conn.disconnect()
@@ -111,10 +123,10 @@ class TestAsync:
     async def test_coroutine_access(self):
         obj = SampleAsync()
 
-        conn = await obj.connect
+        conn = await obj.async_connect
         assert conn.state == 'connected'
 
-        conn = await obj.connect
+        conn = await obj.async_connect
         assert conn.state == 'connected'
 
     @pytest.mark.asyncio
@@ -130,7 +142,7 @@ class TestAsync:
     @pytest.mark.asyncio
     async def test_as_context_manager(self):
         obj = SampleAsync()
-        conn = obj.connection
+        conn = obj.async_connection
         assert conn.state is None
 
         async with conn:
@@ -139,25 +151,30 @@ class TestAsync:
         assert conn.state == 'disconnected'
 
     @pytest.mark.asyncio
-    async def test_hooks(self):
+    async def test_closed_without_invoke(self):
         obj = SampleAsync()
         exception_raised = False
 
         try:
             async with obj:
-                conn = obj.connection
-                sync_conn = obj.sync_connection
-                assert conn.state is None
-                assert sync_conn.state is None
-                await conn.connect()
-                sync_conn.connect()
-                assert conn.state == 'connected'
-                assert sync_conn.state == 'connected'
-
                 raise ZeroDivisionError()
         except ZeroDivisionError:
             exception_raised = True
 
-        assert conn.state == 'disconnected'
-        assert sync_conn.state == 'disconnected'
-        assert exception_raised is True
+        assert obj._closed_resources is None
+
+    @pytest.mark.asyncio
+    async def test_closed_with_invoke(self):
+        obj = SampleAsync()
+        exception_raised = False
+
+        try:
+            async with obj:
+                obj.resource
+                await obj.async_resource
+                await obj.async_resource
+                raise ZeroDivisionError()
+        except ZeroDivisionError:
+            exception_raised = True
+
+        assert obj._closed_resources == ['async', 'async', 'sync']

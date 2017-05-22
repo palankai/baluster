@@ -27,6 +27,9 @@ class ValueStoreProxy:
     def has(self):
         return self._root._has(self._key)
 
+    def add_close_handler(self, handler, resource):
+        self._root._add_close_handler(self._key, handler, resource)
+
 
 class Maker:
 
@@ -38,7 +41,7 @@ class Maker:
         self._cache = cache
         self._readonly = readonly
         self._alias = alias
-        self._hooks = []
+        self._close_handler = None
         if func is not None:
             self(func)
 
@@ -56,6 +59,8 @@ class Maker:
         if proxy.has():
             return proxy.get()
         value = proxy.func()
+        if self._close_handler:
+            proxy.add_close_handler(self._close_handler, value)
         if self._cache:
             proxy.save(value)
         return value
@@ -64,6 +69,8 @@ class Maker:
         if proxy.has():
             return proxy.get()
         value = await proxy.func()
+        if self._close_handler:
+            proxy.add_close_handler(self._close_handler, value)
         if self._cache:
             proxy.save(value)
         return value
@@ -98,17 +105,11 @@ class Maker:
     def _is_async(self):
         return iscoroutinefunction(self._func)
 
-    def hook(self, name):
-        def inner(f):
-            self._hooks.append((name, f))
-            return f
-        return inner
+    def close(self, handler):
+        self._close_handler = handler
+        return handler
 
     def setup(self, instance):
-        self._setup_alias(instance)
-        self._setup_handlers(instance)
-
-    def _setup_alias(self, instance):
         if self._alias is None:
             return
         proxy = self._get_proxy(instance)
@@ -118,14 +119,6 @@ class Maker:
             _getter = partial(self._get, proxy)
         instance._root._set_alias(self._alias, _getter)
 
-    def _setup_handlers(self, instance):
-        root = instance._root
-        for name, handler in self._hooks:
-            _handler = partial(handler, instance, root)
-            if iscoroutinefunction(handler):
-                _handler = coroutine(_handler)
-            root._add_handler(name, _handler)
-
 
 def make(func=None, **kwargs):
     return Maker(func, **kwargs)
@@ -134,7 +127,8 @@ def make(func=None, **kwargs):
 class BaseHolder:
 
     def __init__(
-        self, parent=None, name=None, _vars=None, _alias=None, _handlers=None
+        self, parent=None, name=None, _vars=None, _alias=None, _handlers=None,
+        _close_handlers=None
     ):
         self._parent = parent
         if parent is not None:
@@ -145,6 +139,7 @@ class BaseHolder:
             self._name = None
             self._vars = _vars or dict()
             self._alias = _alias or dict()
+            self._close_handlers = _close_handlers or []
             self._handlers = _handlers or defaultdict(list)
 
     def _join_name(self, *names):
@@ -154,6 +149,12 @@ class BaseHolder:
         if self._name is None:
             return name
         return self._join_name(self._name, name)
+
+    def _get_instance_by_name(self, name):
+        instance = self
+        for part in name.split('.')[:-1]:
+            instance = getattr(instance, part)
+        return instance
 
     def __getitem__(self, name):
         maker = self._alias[name]
@@ -175,40 +176,50 @@ class BaseHolder:
     def _set_alias(self, name, handler):
         self._alias[name] = handler
 
-    def _add_handler(self, name, handler):
-        self._handlers[name].append(handler)
-
-    def __call__(self, name, **kwargs):
-        for handler in self._handlers[name]:
-            handler(**kwargs)
+    def _add_close_handler(self, key, handler, resource):
+        self._close_handlers.append((key, handler, resource))
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        for handler in self._handlers['close']:
-            handler()
+        self.close()
+
+    def close(self):
+        for key, handler, resource in reversed(self._close_handlers):
+            instance = self._get_instance_by_name(key)
+            handler(instance, self, resource)
 
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        for handler in self._handlers['close']:
+        await self.aclose()
+
+    async def aclose(self):
+        for key, handler, resource in reversed(self._close_handlers):
+            instance = self._get_instance_by_name(key)
             if iscoroutinefunction(handler):
-                await handler()
+                await handler(instance, self, resource)
             else:
-                handler()
+                handler(instance, self, resource)
 
     def copy(self, *names):
         _alias = self._alias
         _handlers = self._handlers
         _vars = dict()
+        _close_handlers = []
         for key, value in self._vars.items():
             for name in names:
                 if re.match('^{}$'.format(name), key):
                     _vars[key] = value
+        for key, handler, resource in self._close_handlers:
+            for name in names:
+                if re.match('^{}$'.format(name), key):
+                    _close_handlers.append((key, handler, resource))
         return self.__class__(
-            _alias=_alias, _handlers=_handlers, _vars=_vars
+            _alias=_alias, _handlers=_handlers, _vars=_vars,
+            _close_handlers=_close_handlers
         )
 
 
