@@ -6,6 +6,28 @@ from inspect import isclass
 from functools import partial
 
 
+class ValueStoreProxy:
+
+    def __init__(self, name, instance):
+        self._instance = instance
+        self._root = instance._root
+        self._name = name
+        self._key = instance._get_member_name(name)
+
+    @property
+    def root(self):
+        return self._root
+
+    def get(self):
+        return self._root._get(self._key)
+
+    def save(self, value):
+        self._root._save(self._key, value)
+
+    def has(self):
+        return self._root._has(self._key)
+
+
 class Maker:
 
     def __init__(
@@ -32,9 +54,8 @@ class Maker:
         return self._get(instance)
 
     def __set__(self, instance, value):
-        root = instance._root
-        name = instance._get_member_name(self._name)
-        if root._has(name):
+        proxy = ValueStoreProxy(self._name, instance)
+        if proxy.has():
             raise AttributeError(
                 'The value `{name}` has already been set'.format(
                     name=self._name
@@ -46,7 +67,7 @@ class Maker:
                     name=self._name
                 )
             )
-        root._set(name, value)
+        proxy.save(value)
 
     def __delete__(self, instance):
         raise AttributeError('Attribute cannot be deleted')
@@ -56,23 +77,21 @@ class Maker:
         self._owner = owner
 
     def _get(self, instance):
-        root = instance._root
-        name = instance._get_member_name(self._name)
-        if root._has(name):
-            return root._get(name)
-        value = self._func(instance, root)
+        proxy = ValueStoreProxy(self._name, instance)
+        if proxy.has():
+            return proxy.get()
+        value = self._func(instance, proxy.root)
         if self._cache:
-            root._set(name, value)
+            proxy.save(value)
         return value
 
     async def _async_get(self, instance):
-        root = instance._root
-        name = instance._get_member_name(self._name)
-        if root._has(name):
-            return root._get(name)
-        value = await self._func(instance, root)
+        proxy = ValueStoreProxy(self._name, instance)
+        if proxy.has():
+            return proxy.get()
+        value = await self._func(instance, proxy.root)
         if self._cache:
-            root._set(name, value)
+            proxy.save(value)
         return value
 
     def hook(self, name):
@@ -136,7 +155,7 @@ class BaseHolder:
         for alias in self._alias:
             yield alias
 
-    def _set(self, name, value):
+    def _save(self, name, value):
         self._vars[name] = value
 
     def _get(self, name):
