@@ -1,18 +1,20 @@
-===================
-Python Factory Tree
-===================
+==================================
+Baluster - Python Composition tool
+==================================
 
-.. image:: https://travis-ci.org/palankai/factory_tree.svg?branch=master
-    :target: https://travis-ci.org/palankai/factory_tree
+.. image:: https://travis-ci.org/palankai/baluster.svg?branch=master
+    :target: https://travis-ci.org/palankai/baluster
 
-| Project homepage: `<https://github.com/palankai/factory_tree>`_
-| Issues: `<https://github.com/palankai/factory_tree/issues>`_
+| Project homepage: `<https://github.com/palankai/baluster>`_
+| Issues: `<https://github.com/palankai/baluster/issues>`_
 |
 
 What is this package for
 ------------------------
 
-This package provides a simple way to build composite root for an app.
+This package provides a simple way to build back structure of application.
+Can be used building composite root as acting a factory for resources,
+building a fixture factory for tests.
 
 Features
 --------
@@ -26,10 +28,10 @@ Example - composie root
 
 .. code:: python
 
-    from ns import NS, maker
+    from baluster import Holder, maker
     import psycopg2
 
-    class ApplicationRoot(NS):
+    class ApplicationRoot(Holder):
         @maker
         def db(self, root):
             # Will be called at the first use
@@ -62,17 +64,17 @@ Example - fixture factory for tests
 
 .. code:: python
 
-    from ns import NS, maker
+    from baluster import Holder, maker
     import psycopg2
 
-    class Fixtures(NS):
+    class Fixtures(Holder):
 
         @maker
         def cr(self, root):
             conn = psycopg2.connect("dbname=test user=postgres")
             return conn.cursor()
 
-        class users(NS):
+        class users(Holder):
 
             @maker
             def user(self, root):
@@ -84,7 +86,7 @@ Example - fixture factory for tests
                 root.cr.execute('SELECT * FROM customer WHERE id=1')
                 return Customer(root.cr.fetchone())
 
-        class orders(NS):
+        class orders(Holder):
 
             @maker
             def amount(self, root):
@@ -144,7 +146,7 @@ Python target: >=3.6
 
 .. code::
 
-    $ pip install factory_tree
+    $ pip install baluster
 
 Dependencies
 ------------
