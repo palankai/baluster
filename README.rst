@@ -38,17 +38,17 @@ Example - composie root
             # Will be cached so won't be called again
             return psycopg2.connect("dbname=test user=postgres")
 
-        @db.hook('close')
-        def _close_db(self, root):
-            self.db.close()
+        @db.close
+        def _close_db(self, root, db):
+            db.close()
 
         @maker
         def cr(self, root):
             return self.db.cursor()
 
-        @cr.hook('close')
-        def _close_cr(self, root):
-            self.cr.close()
+        @cr.close
+        def _close_cr(self, root, cr):
+            cr.close()
 
 
     def main():
@@ -57,6 +57,35 @@ Example - composie root
             approot.cr.execute('SELECT * FROM user')
 
         # at this point the connection and the cursor has already been closed
+
+
+Example - async composie root
+-----------------------------
+
+.. code:: python
+
+    from baluster import Holder, maker
+
+    class AsyncApplicationRoot(Holder):
+
+        @maker
+        async def resource(self, root):
+            # Will be called at the first use
+            # Will be cached so won't be called again
+            return await some_aync_resource()
+
+        @db.close
+        async def _close_resource(self, root, resource):
+            await resource.close()
+
+
+    def main():
+        approot = AsyncApplicationRoot()
+        async with approot:
+            conn = await approot.resource
+            await conn.operation(...)
+
+        # at this point the resource has already been closed
 
 
 Example - fixture factory for tests
