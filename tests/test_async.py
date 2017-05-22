@@ -27,6 +27,28 @@ class SampleAsyncConnection:
         self._state = 'disconnected'
         return self
 
+    async def fetch_some(self):
+        return 'some'
+
+
+class SampleSyncConnection:
+
+    def __init__(self):
+        self._state = None
+
+    @property
+    def state(self):
+        return self._state
+
+    def connect(self):
+        assert self._state != 'connected'
+        self._state = 'connected'
+        return self
+
+    def disconnect(self):
+        self._state = 'disconnected'
+        return self
+
 
 class SampleAsync(Holder):
 
@@ -34,16 +56,43 @@ class SampleAsync(Holder):
     def connection(self, root):
         return SampleAsyncConnection()
 
+    @make
+    def sync_connection(self, root):
+        return SampleSyncConnection()
+
     @make(alias='conn')
     async def connect(self, root):
         conn = root.connection
         await conn.connect()
         return conn
 
+    @make(cache=False)
+    async def fetch_some(self, root):
+        conn = root.connection
+        result = await conn.fetch_some()
+        return result
+
     @connection.hook('close')
     async def disconnect(self, root):
         conn = root.connection
         await conn.disconnect()
+
+    @make
+    async def sync_connect(self, root):
+        conn = root.sync_connection
+        conn.connect()
+        return conn
+
+    @make
+    async def sync_connect(self, root):
+        conn = root.sync_connection
+        conn.connect()
+        return conn
+
+    @sync_connection.hook('close')
+    def sync_disconnect(self, root):
+        conn = root.sync_connection
+        conn.disconnect()
 
 
 class TestAsync:
@@ -57,6 +106,9 @@ class TestAsync:
 
         await conn.connect()
         assert conn.state == 'connected'
+
+        res = await obj.fetch_some
+        assert res == 'some'
 
         await conn.disconnect()
         assert conn.state == 'disconnected'
@@ -98,8 +150,13 @@ class TestAsync:
 
         async with obj:
             conn = obj.connection
+            sync_conn = obj.sync_connection
             assert conn.state is None
+            assert sync_conn.state is None
             await conn.connect()
+            sync_conn.connect()
             assert conn.state == 'connected'
+            assert sync_conn.state == 'connected'
 
         assert conn.state == 'disconnected'
+        assert sync_conn.state == 'disconnected'

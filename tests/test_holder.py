@@ -45,6 +45,9 @@ class TestHolder:
 
         assert obj.value == 0
 
+    def test_class_level_access(self):
+        assert CompositeRootCase.value._name == 'value'
+
     def test_close(self):
         obj = CompositeRootCase()
 
