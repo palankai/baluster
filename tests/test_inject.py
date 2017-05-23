@@ -22,6 +22,15 @@ class CompositeRoot(Holder):
         self._counter += 1
         return self._counter * 5
 
+    class level1(Holder):
+
+        class level2(Holder):
+
+            @Holder.factory(cache=False, alias='deep_resource')
+            def resource(self, root):
+                root._counter += 1
+                return root._counter * 7
+
 
 class FakeBinder:
 
@@ -43,11 +52,21 @@ class TestInjectBind:
         assert 'resource' in fake_binder.bindings
         assert 'resource2' in fake_binder.bindings
         assert 'async_resource' in fake_binder.bindings
+        assert 'deep_resource' in fake_binder.bindings
 
         assert fake_binder.bindings['resource']() == 1
         assert fake_binder.bindings['resource']() == 2
         assert fake_binder.bindings['resource2']() == 9
         assert fake_binder.bindings['resource']() == 4
+
+    def test_calling_binder_for_nested_instance(self):
+        obj = CompositeRoot()
+
+        fake_binder = FakeBinder()
+        obj.inject_config(fake_binder)
+
+        assert fake_binder.bindings['resource']() == 1
+        assert fake_binder.bindings['deep_resource']() == 14
 
     @pytest.mark.asyncio
     async def test_calling_binder_async(self):

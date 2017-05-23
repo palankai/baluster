@@ -152,14 +152,6 @@ class BaseHolder:
             instance = getattr(instance, part)
         return instance
 
-    def __getitem__(self, name):
-        maker = self._alias[name]
-        return maker()
-
-    def __iter__(self):
-        for alias in self._alias:
-            yield alias
-
     def _save(self, name, value):
         self._vars[name] = value
 
