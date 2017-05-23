@@ -21,7 +21,7 @@ class CompositeRoot(Holder):
 
     class subns_2(Holder):
 
-        @Holder.factory(alias='subns_2_value')
+        @Holder.factory
         def value(self, root):
             return root.subns.value + 3
 
@@ -39,7 +39,6 @@ class TestNested:
         obj.subns.value = 3
 
         assert obj.subns_2.value == 6
-        assert obj['subns_2_value'] == 6
 
     def test_nested_close(self):
         obj = CompositeRoot()

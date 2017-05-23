@@ -62,7 +62,7 @@ class SampleAsync(Holder):
     def sync_connection(self, root):
         return SampleSyncConnection()
 
-    @Holder.factory(alias='conn')
+    @Holder.factory
     async def async_connect(self, root):
         conn = root.async_connection
         await conn.connect()
@@ -127,16 +127,6 @@ class TestAsync:
         assert conn.state == 'connected'
 
         conn = await obj.async_connect
-        assert conn.state == 'connected'
-
-    @pytest.mark.asyncio
-    async def test_coroutine_access_by_alias(self):
-        obj = SampleAsync()
-
-        conn = await obj['conn']
-        assert conn.state == 'connected'
-
-        conn = await obj['conn']
         assert conn.state == 'connected'
 
     @pytest.mark.asyncio

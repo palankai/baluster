@@ -34,13 +34,13 @@ class ValueStoreProxy:
 class Maker:
 
     def __init__(
-        self, func=None, *, cache=True, readonly=False, alias=None
+        self, func=None, *, cache=True, readonly=False, inject=None
     ):
         self._owner = None
         self._name = None
         self._cache = cache
         self._readonly = readonly
-        self._alias = alias
+        self._inject = inject
         self._close_handler = None
         if func is not None:
             self(func)
@@ -110,20 +110,20 @@ class Maker:
         return handler
 
     def setup(self, instance):
-        if self._alias is None:
+        if self._inject is None:
             return
         proxy = self._get_proxy(instance)
         if self._is_async:
             _getter = coroutine(partial(self._async_get, proxy))
         else:
             _getter = partial(self._get, proxy)
-        instance._root._set_alias(self._alias, _getter)
+        instance._root._set_inject(self._inject, _getter)
 
 
 class BaseHolder:
 
     def __init__(
-        self, parent=None, name=None, _vars=None, _alias=None, _handlers=None,
+        self, parent=None, name=None, _vars=None, _inject=None, _handlers=None,
         _close_handlers=None
     ):
         self._parent = parent
@@ -134,7 +134,7 @@ class BaseHolder:
             self._root = self
             self._name = None
             self._vars = _vars or dict()
-            self._alias = _alias or dict()
+            self._inject = _inject or dict()
             self._close_handlers = _close_handlers or []
             self._handlers = _handlers or defaultdict(list)
 
@@ -152,14 +152,6 @@ class BaseHolder:
             instance = getattr(instance, part)
         return instance
 
-    def __getitem__(self, name):
-        maker = self._alias[name]
-        return maker()
-
-    def __iter__(self):
-        for alias in self._alias:
-            yield alias
-
     def _save(self, name, value):
         self._vars[name] = value
 
@@ -169,8 +161,8 @@ class BaseHolder:
     def _has(self, name):
         return name in self._vars
 
-    def _set_alias(self, name, handler):
-        self._alias[name] = handler
+    def _set_inject(self, name, handler):
+        self._inject[name] = handler
 
     def _add_close_handler(self, key, handler, resource):
         self._close_handlers.append((key, handler, resource))
@@ -201,7 +193,7 @@ class BaseHolder:
                 handler(instance, self, resource)
 
     def copy(self, *names):
-        _alias = self._alias
+        _inject = self._inject
         _handlers = self._handlers
         _vars = dict()
         _close_handlers = []
@@ -214,13 +206,19 @@ class BaseHolder:
                 if re.match('^{}$'.format(name), key):
                     _close_handlers.append((key, handler, resource))
         return self.__class__(
-            _alias=_alias, _handlers=_handlers, _vars=_vars,
+            _inject=_inject, _handlers=_handlers, _vars=_vars,
             _close_handlers=_close_handlers
         )
 
     @staticmethod
     def factory(func=None, **kwargs):
         return Maker(func, **kwargs)
+
+    def inject_config(self, binder):
+        def get_lambda(maker):
+            return lambda: maker()
+        for key, maker in self._inject.items():
+            binder.bind_to_provider(key, get_lambda(maker))
 
 
 class HolderType(type):

@@ -27,10 +27,6 @@ class CompositeRootCase(Holder):
     def value_readonly(self, root):
         return self._value
 
-    @Holder.factory(alias='alias')
-    def value_alias(self, root):
-        return 'as alias'
-
     @Holder.factory
     def resource_1(self, root):
         return 1
@@ -88,25 +84,6 @@ class TestHolder:
         except ZeroDivisionError:
             exception_raised = True
         assert exception_raised is True
-
-        assert obj._closed_resources == [2, 2, 1]
-
-    def test_alias(self):
-        obj = CompositeRootCase()
-
-        assert obj.value_alias == 'as alias'
-        assert obj['alias'] == 'as alias'
-
-    def test_alias_access(self):
-        obj = CompositeRootCase()
-
-        assert list(obj) == ['alias']
-
-    def test_alias_if_set(self):
-        obj = CompositeRootCase()
-
-        obj.value_alias = 1
-        assert obj['alias'] == 1
 
     def test_no_cahce(self):
         obj = CompositeRootCase()
