@@ -68,6 +68,20 @@ class TestInjectBind:
         assert fake_binder.bindings['resource']() == 1
         assert fake_binder.bindings['deep_resource']() == 14
 
+    def test_calling_binder_then_copy(self):
+        obj = CompositeRoot()
+
+        assert obj.resource == 1
+        assert obj.resource == 2
+        assert obj.resource == 3
+
+        copy = obj.copy()
+        assert copy.resource == 1
+        fake_binder = FakeBinder()
+        obj.inject_config(fake_binder)
+
+        assert fake_binder.bindings['resource']() == 2
+
     @pytest.mark.asyncio
     async def test_calling_binder_async(self):
         obj = CompositeRoot()
