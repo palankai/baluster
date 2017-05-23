@@ -7,17 +7,17 @@ class CompositeRoot(Holder):
 
     _counter = 0
 
-    @Holder.factory(cache=False, alias='resource')
+    @Holder.factory(cache=False, inject='resource')
     def resource(self, root):
         self._counter += 1
         return self._counter
 
-    @Holder.factory(cache=False, alias='resource2')
+    @Holder.factory(cache=False, inject='resource2')
     def resource2(self, root):
         self._counter += 1
         return self._counter * 3
 
-    @Holder.factory(cache=False, alias='async_resource')
+    @Holder.factory(cache=False, inject='async_resource')
     async def async_resource(self, root):
         self._counter += 1
         return self._counter * 5
@@ -26,7 +26,7 @@ class CompositeRoot(Holder):
 
         class level2(Holder):
 
-            @Holder.factory(cache=False, alias='deep_resource')
+            @Holder.factory(cache=False, inject='deep_resource')
             def resource(self, root):
                 root._counter += 1
                 return root._counter * 7
