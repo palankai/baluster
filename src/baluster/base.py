@@ -222,6 +222,12 @@ class BaseHolder:
     def factory(func=None, **kwargs):
         return Maker(func, **kwargs)
 
+    def inject_config(self, binder):
+        def get_lambda(maker):
+            return lambda: maker()
+        for key, maker in self._alias.items():
+            binder.bind_to_provider(key, get_lambda(maker))
+
 
 class HolderType(type):
 
