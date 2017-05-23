@@ -123,13 +123,13 @@ class Maker:
 class BaseHolder:
 
     def __init__(
-        self, parent=None, name=None, _vars=None, _inject=None, _handlers=None,
-        _close_handlers=None
+        self, _parent=None, _name=None, _vars=None, _inject=None,
+        _handlers=None, _close_handlers=None, **params
     ):
-        self._parent = parent
-        if parent is not None:
-            self._root = parent._root
-            self._name = self._parent._get_member_name(name)
+        self._parent = _parent
+        if _parent is not None:
+            self._root = _parent._root
+            self._name = self._parent._get_member_name(_name)
         else:
             self._root = self
             self._name = None
@@ -137,6 +137,7 @@ class BaseHolder:
             self._inject = _inject or dict()
             self._close_handlers = _close_handlers or []
             self._handlers = _handlers or defaultdict(list)
+            self._params = params
 
     def _join_name(self, *names):
         return '.'.join(names)
@@ -207,7 +208,7 @@ class BaseHolder:
                     _close_handlers.append((key, handler, resource))
         return self.__class__(
             _inject=_inject, _handlers=_handlers, _vars=_vars,
-            _close_handlers=_close_handlers
+            _close_handlers=_close_handlers, **self._params
         )
 
     @staticmethod
@@ -245,6 +246,6 @@ class Holder(BaseHolder, metaclass=HolderType):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name, nested in self._nested:
-            setattr(self, name, nested(parent=self, name=name))
+            setattr(self, name, nested(_parent=self, _name=name))
         for maker in self._makers:
             maker.setup(self)
