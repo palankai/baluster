@@ -1,5 +1,4 @@
 from asyncio import iscoroutinefunction, coroutine
-from collections import defaultdict
 from functools import partial
 from inspect import isclass
 import re
