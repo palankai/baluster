@@ -1,5 +1,4 @@
 from asyncio import iscoroutinefunction, coroutine
-from collections import defaultdict
 from functools import partial
 from inspect import isclass
 import re
@@ -138,7 +137,7 @@ class BaseHolder:
 
     def __init__(
         self, _parent=None, _name=None, _resources=None, _inject=None,
-        _handlers=None, _close_handlers=None, **params
+        _close_handlers=None, **params
     ):
         self._parent = _parent
         if _parent is not None:
@@ -150,7 +149,6 @@ class BaseHolder:
             self._resources = _resources or dict()
             self._inject = _inject or dict()
             self._close_handlers = _close_handlers or []
-            self._handlers = _handlers or defaultdict(list)
             self._params = params
 
     def _join_name(self, *names):
@@ -206,7 +204,6 @@ class BaseHolder:
 
     def partial_copy(self, *names):
         _inject = self._inject
-        _handlers = self._handlers
         _resources = dict()
         _close_handlers = []
         for key, value in self._resources.items():
@@ -218,7 +215,7 @@ class BaseHolder:
                 if re.match('^{}$'.format(name), key):
                     _close_handlers.append((key, handler, resource))
         return self.__class__(
-            _inject=_inject, _handlers=_handlers, _resources=_resources,
+            _inject=_inject, _resources=_resources,
             _close_handlers=_close_handlers, **self._params
         )
 
