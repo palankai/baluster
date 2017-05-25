@@ -1,1 +1,1 @@
-from .base import Holder  # noqa
+from .base import Holder, MultipleExceptions  # noqa

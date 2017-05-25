@@ -175,9 +175,15 @@ class BaseHolder:
         self.close()
 
     def close(self):
+        exceptions = []
         for key, handler, resource in reversed(self._close_handlers):
             instance = self._get_instance_by_name(key)
-            handler(instance, self, resource)
+            try:
+                handler(instance, self, resource)
+            except Exception as ex:
+                exceptions.append(ex)
+        if exceptions:
+            raise MultipleExceptions(exceptions)
 
     async def __aenter__(self):
         return self
@@ -186,12 +192,18 @@ class BaseHolder:
         await self.aclose()
 
     async def aclose(self):
+        exceptions = []
         for key, handler, resource in reversed(self._close_handlers):
             instance = self._get_instance_by_name(key)
-            if iscoroutinefunction(handler):
-                await handler(instance, self, resource)
-            else:
-                handler(instance, self, resource)
+            try:
+                if iscoroutinefunction(handler):
+                    await handler(instance, self, resource)
+                else:
+                    handler(instance, self, resource)
+            except Exception as ex:
+                exceptions.append(ex)
+        if exceptions:
+            raise MultipleExceptions(exceptions)
 
     def copy(self, *names):
         _inject = self._inject
@@ -249,3 +261,14 @@ class Holder(BaseHolder, metaclass=HolderType):
             setattr(self, name, nested(_parent=self, _name=name))
         for maker in self._makers:
             maker.setup(self)
+
+
+class MultipleExceptions(Exception):
+
+    def __init__(self, exceptions):
+        self._exceptions = exceptions
+        super().__init__('Multiple exceptions occured')
+
+    @property
+    def exceptions(self):
+        return self._exceptions
