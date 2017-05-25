@@ -12,29 +12,42 @@ class ValueStoreProxy:
         self._root = instance._root
         self._name = name
         self._key = instance._get_member_name(name)
-        self._func = partial(func, self._instance, self._root)
+        self._func = partial(func, self._instance)
 
     @property
     def func(self):
         return self._func
 
+    @property
+    def root(self):
+        return self._root
+
     def get(self):
-        return self._root._get(self._key)
+        return self._root._resources[self._key]
 
     def save(self, value):
-        self._root._save(self._key, value)
+        self._root._resources[self._key] = value
 
     def has(self):
-        return self._root._has(self._key)
+        return self._key in self._root._resources
 
     def add_close_handler(self, handler, resource):
-        self._root._add_close_handler(self._key, handler, resource)
+        self._root._close_handlers.append((self._key, handler, resource))
+
+    def get_args(self, args):
+        params = []
+        for name in args:
+            if name == 'root':
+                params.append(self.root)
+            else:
+                params.append(self.root._params.get(name))
+        return params
 
 
 class Maker:
 
     def __init__(
-        self, func=None, *, cache=True, readonly=False, inject=None
+        self, func=None, *, cache=True, readonly=False, inject=None, args=None
     ):
         self._owner = None
         self._name = None
@@ -42,6 +55,7 @@ class Maker:
         self._readonly = readonly
         self._inject = inject
         self._close_handler = None
+        self._args = args or ['root']
         if func is not None:
             self(func)
 
@@ -58,7 +72,7 @@ class Maker:
     def _get(self, proxy):
         if proxy.has():
             return proxy.get()
-        value = proxy.func()
+        value = proxy.func(*proxy.get_args(self._args))
         if self._close_handler:
             proxy.add_close_handler(self._close_handler, value)
         if self._cache:
@@ -68,7 +82,7 @@ class Maker:
     async def _async_get(self, proxy):
         if proxy.has():
             return proxy.get()
-        value = await proxy.func()
+        value = await proxy.func(*proxy.get_args(self._args))
         if self._close_handler:
             proxy.add_close_handler(self._close_handler, value)
         if self._cache:
@@ -117,13 +131,13 @@ class Maker:
             _getter = coroutine(partial(self._async_get, proxy))
         else:
             _getter = partial(self._get, proxy)
-        instance._root._set_inject(self._inject, _getter)
+        instance._root._inject[self._inject] = _getter
 
 
 class BaseHolder:
 
     def __init__(
-        self, _parent=None, _name=None, _vars=None, _inject=None,
+        self, _parent=None, _name=None, _resources=None, _inject=None,
         _handlers=None, _close_handlers=None, **params
     ):
         self._parent = _parent
@@ -133,7 +147,7 @@ class BaseHolder:
         else:
             self._root = self
             self._name = None
-            self._vars = _vars or dict()
+            self._resources = _resources or dict()
             self._inject = _inject or dict()
             self._close_handlers = _close_handlers or []
             self._handlers = _handlers or defaultdict(list)
@@ -152,21 +166,6 @@ class BaseHolder:
         for part in name.split('.')[:-1]:
             instance = getattr(instance, part)
         return instance
-
-    def _save(self, name, value):
-        self._vars[name] = value
-
-    def _get(self, name):
-        return self._vars[name]
-
-    def _has(self, name):
-        return name in self._vars
-
-    def _set_inject(self, name, handler):
-        self._inject[name] = handler
-
-    def _add_close_handler(self, key, handler, resource):
-        self._close_handlers.append((key, handler, resource))
 
     def __enter__(self):
         return self
@@ -205,21 +204,21 @@ class BaseHolder:
         if exceptions:
             raise MultipleExceptions(exceptions)
 
-    def copy(self, *names):
+    def partial_copy(self, *names):
         _inject = self._inject
         _handlers = self._handlers
-        _vars = dict()
+        _resources = dict()
         _close_handlers = []
-        for key, value in self._vars.items():
+        for key, value in self._resources.items():
             for name in names:
                 if re.match('^{}$'.format(name), key):
-                    _vars[key] = value
+                    _resources[key] = value
         for key, handler, resource in self._close_handlers:
             for name in names:
                 if re.match('^{}$'.format(name), key):
                     _close_handlers.append((key, handler, resource))
         return self.__class__(
-            _inject=_inject, _handlers=_handlers, _vars=_vars,
+            _inject=_inject, _handlers=_handlers, _resources=_resources,
             _close_handlers=_close_handlers, **self._params
         )
 

@@ -119,7 +119,7 @@ class TestHolder:
         obj.value = 3
         assert obj.value == 3
 
-        copy = obj.copy()
+        copy = obj.partial_copy()
         assert copy.value == 0
 
     def test_copy_keep_values(self):
@@ -129,7 +129,7 @@ class TestHolder:
         assert obj.value == 3
         assert obj.value_plus_100 == 103
 
-        copy = obj.copy('value')
+        copy = obj.partial_copy('value')
         assert copy.value == 3
         assert copy.value_plus_100 == 100
 
@@ -138,7 +138,7 @@ class TestHolder:
         with obj:
             obj.resource_1
             obj.resource_2
-            copy = obj.copy('resource_1')
+            copy = obj.partial_copy('resource_1')
         assert obj._closed_resources == [2, 1]
 
         with copy:
