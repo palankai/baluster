@@ -49,10 +49,10 @@ class TestNested:
 
     def test_nested_copy(self):
         obj = CompositeRoot()
-        copyA = obj.copy('subns.value')
+        copyA = obj.partial_copy('subns.value')
 
         obj.subns.value = 3
-        copyB = obj.copy('subns.value')
+        copyB = obj.partial_copy('subns.value')
 
         assert copyA.subns_2.value == 4
         assert copyB.subns_2.value == 6

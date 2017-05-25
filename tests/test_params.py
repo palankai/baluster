@@ -5,9 +5,11 @@ class CompositeRoot(Holder):
 
     class params(Holder):
 
-        @Holder.factory
-        def debug(self, root):
-            return root._params.get('env', {}).get('DEBUG', False)
+        @Holder.factory(args=['root', 'env'])
+        def debug(self, root, env):
+            if env is None:
+                return None
+            return env.get('DEBUG', False)
 
     @Holder.factory(cache=False)
     def resource(self, root):
@@ -30,6 +32,6 @@ class TestParams:
         assert obj.resource == 'debug'
 
     def test_access_params_after_copy(self):
-        obj = CompositeRoot(env={'DEBUG': True}).copy()
+        obj = CompositeRoot(env={'DEBUG': True}).partial_copy()
 
         assert obj.resource == 'debug'

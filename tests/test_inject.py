@@ -75,7 +75,7 @@ class TestInjectBind:
         assert obj.resource == 2
         assert obj.resource == 3
 
-        copy = obj.copy()
+        copy = obj.partial_copy()
         assert copy.resource == 1
         fake_binder = FakeBinder()
         obj.inject_config(fake_binder)
