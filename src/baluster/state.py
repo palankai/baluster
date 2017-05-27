@@ -1,7 +1,6 @@
 from collections import ChainMap
-import re
 
-from .utils import make_if_none
+from .utils import make_if_none, dict_partial_copy
 
 
 class State:
@@ -71,10 +70,5 @@ class State:
             data=self._data.new_child()
         )
 
-    def partial_copy(self, include):
-        resources = dict()
-        for key, value in self._resources.items():
-            for name in include:
-                if re.match('^{}$'.format(name), key):
-                    resources[key] = value
-        return self.new_child(resources)
+    def partial_copy(self, patterns):
+        return self.new_child(dict_partial_copy(self._resources, patterns))
