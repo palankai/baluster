@@ -1,1 +1,1 @@
-from .base import Holder, MultipleExceptions  # noqa
+from .base import Holder, MultipleExceptions, ContextManagerReusedError  # noqa

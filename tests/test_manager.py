@@ -1,6 +1,6 @@
 import pytest
 
-from baluster import Holder
+from baluster import Holder, ContextManagerReusedError
 
 
 class Resource:
@@ -109,3 +109,19 @@ class TestManager:
 
         assert ctx.resource.connected is False
         ctx.close()
+
+    def test_reusing_ctx(self):
+
+        root = CompositeRoot()
+        ctx = root.enter()
+
+        with ctx:
+            pass
+
+        with ctx:
+            pass
+
+        with ctx:
+            with pytest.raises(ContextManagerReusedError):
+                with ctx:
+                    pass

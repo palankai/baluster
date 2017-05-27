@@ -138,11 +138,16 @@ class Manager:
 
     def __init__(self, managed):
         self._managed = managed.__class__(managed._state.new_child())
+        self._active = False
 
     def __enter__(self):
+        if self._active is True:
+            raise ContextManagerReusedError()
+        self._active = True
         return self._managed
 
     def __exit__(self, exc_type, exc_value, traceback):
+        self._active = False
         self._managed.close()
 
     async def __aenter__(self):
@@ -322,6 +327,10 @@ class MultipleExceptions(Exception):
     @property
     def exceptions(self):
         return self._exceptions
+
+
+class ContextManagerReusedError(Exception):
+    pass
 
 
 def make_if_none(obj, default):
