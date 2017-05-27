@@ -44,10 +44,10 @@ class CompositeRoot(Holder):
 class TestClosingResource:
 
     def test_closing_sync_resource(self):
-        obj = CompositeRoot()
+        root = CompositeRoot()
 
         with pytest.raises(MultipleExceptions) as excinfo:
-            with obj:
+            with root.enter() as obj:
                 obj.resource
                 obj.buggy_resource
 
@@ -58,10 +58,10 @@ class TestClosingResource:
 
     @pytest.mark.asyncio
     async def test_closing_async_resource(self):
-        obj = CompositeRoot()
+        root = CompositeRoot()
 
         with pytest.raises(MultipleExceptions) as excinfo:
-            async with obj:
+            async with root.enter() as obj:
                 obj.resource
                 obj.buggy_resource
                 await obj.async_resource

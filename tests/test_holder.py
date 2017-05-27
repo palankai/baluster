@@ -63,7 +63,7 @@ class TestHolder:
         exception_raised = False
 
         try:
-            with obj:
+            with obj.enter():
                 raise ZeroDivisionError()
         except ZeroDivisionError:
             exception_raised = True
@@ -76,10 +76,10 @@ class TestHolder:
         exception_raised = False
 
         try:
-            with obj:
-                obj.resource_1
-                obj.resource_2
-                obj.resource_2
+            with obj.enter() as o:
+                o.resource_1
+                o.resource_2
+                o.resource_2
                 raise ZeroDivisionError()
         except ZeroDivisionError:
             exception_raised = True
@@ -135,12 +135,12 @@ class TestHolder:
 
     def test_close_action_copy(self):
         obj = CompositeRootCase()
-        with obj:
+        with obj.enter():
             obj.resource_1
             obj.resource_2
             copy = obj.partial_copy('resource_1')
         assert obj._closed_resources == [2, 1]
 
-        with copy:
+        with copy.enter():
             pass
         assert copy._closed_resources == [1]

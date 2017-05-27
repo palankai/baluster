@@ -134,6 +134,42 @@ class Maker:
         instance._root._inject[self._inject] = _getter
 
 
+class Manager:
+
+    def __init__(self, managed):
+        self._managed = managed
+
+    # Delegate attribute lookup to internal obj
+    def __getattr__(self, name):
+        return getattr(self._managed, name)
+
+    # Delegate attribute assignment
+    def __setattr__(self, name, value):
+        if name.startswith('_'):
+            super().__setattr__(name, value)
+        else:
+            setattr(self._managed, name, value)
+
+    # Delegate attribute deletion
+    def __delattr__(self, name):
+        if name.startswith('_'):
+            raise AttributeError('Manager attributes cannot be deleted')
+        else:
+            delattr(self._managed, name)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._managed.close()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self._managed.aclose()
+
+
 class BaseHolder:
 
     def __init__(
@@ -167,11 +203,8 @@ class BaseHolder:
             instance = getattr(instance, part)
         return instance
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
+    def enter(self):
+        return Manager(self)
 
     def close(self):
         exceptions = []
@@ -183,12 +216,6 @@ class BaseHolder:
                 exceptions.append(ex)
         if exceptions:
             raise MultipleExceptions(exceptions)
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self.aclose()
 
     async def aclose(self):
         exceptions = []
