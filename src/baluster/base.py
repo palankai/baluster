@@ -12,15 +12,14 @@ from .utils import (
 
 class ValueStoreProxy:
 
-    __slots__ = ('_instance', '_root', '_state', '_name', '_key', '_func')
+    __slots__ = ('_root', '_state', '_name', '_key', '_func')
 
     def __init__(self, name, instance, func):
-        self._instance = instance
         self._root = instance._root
         self._state = self._root._state
         self._name = name
         self._key = get_member_name(instance._name, name)
-        self._func = partial(func, self._instance)
+        self._func = partial(func, instance)
 
     @property
     def func(self):
@@ -78,14 +77,17 @@ class Maker:
     def _get(self, proxy):
         if proxy.has():
             return proxy.get()
-        value = proxy.func(*proxy.get_args(self._args))
+        value = self._get_func(proxy)
         return self._process_value(proxy, value)
 
     async def _async_get(self, proxy):
         if proxy.has():
             return proxy.get()
-        value = await proxy.func(*proxy.get_args(self._args))
+        value = await self._get_func(proxy)
         return self._process_value(proxy, value)
+
+    def _get_func(self, proxy):
+        return proxy.func(*proxy.get_args(self._args))
 
     def _process_value(self, proxy, value):
         if self._invalidate_after_closed:
@@ -135,15 +137,18 @@ class Maker:
             return inner
         return inner(handler)
 
-    def setup(self, instance):
+    def get_getter(self, instance):
         if self._inject is None:
             return
         proxy = self._get_proxy(instance)
         if self.is_async:
-            _getter = async_partial(self._async_get, proxy)
-        else:
-            _getter = partial(self._get, proxy)
-        instance._root._state.set_inject(self._inject, _getter)
+            return async_partial(self._async_get, proxy)
+        return partial(self._get, proxy)
+
+    def setup(self, instance, state):
+        getter = self.get_getter(instance)
+        if getter:
+            state.set_inject(self._inject, getter)
 
 
 class BaseHolder:
@@ -232,4 +237,4 @@ class Holder(BaseHolder, metaclass=HolderType):
         for name, nested in self._nested:
             setattr(self, name, nested(_parent=self, _name=name))
         for maker in self._makers:
-            maker.setup(self)
+            maker.setup(self, self._root._state)
