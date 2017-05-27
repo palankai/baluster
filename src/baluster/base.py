@@ -137,18 +137,16 @@ class Maker:
             return inner
         return inner(handler)
 
-    def get_getter(self, instance):
-        if self._inject is None:
-            return
+    def get_injectable(self, instance):
         proxy = self._get_proxy(instance)
         if self.is_async:
             return async_partial(self._async_get, proxy)
         return partial(self._get, proxy)
 
     def setup(self, instance, state):
-        getter = self.get_getter(instance)
-        if getter:
-            state.set_inject(self._inject, getter)
+        if self._inject is None:
+            return
+        state.set_inject(self._inject, self.get_injectable(instance))
 
 
 class BaseHolder:
