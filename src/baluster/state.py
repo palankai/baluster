@@ -29,10 +29,16 @@ class State:
         del self._resources[key]
 
     def get_data(self, name):
-        return self._data.get(name)
+        return self._data[name]
 
     def set_data(self, name, value):
         self._data[name] = value
+
+    def del_data(self, name):
+        del self._data[name]
+
+    def has_data(self, name):
+        return name in self._data
 
     @property
     def close_handlers(self):

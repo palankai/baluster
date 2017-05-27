@@ -166,6 +166,12 @@ class BaseHolder:
     def __setitem__(self, name, value):
         self._state.set_data(name, value)
 
+    def __delitem__(self, name):
+        self._state.del_data(name)
+
+    def __contains__(self, name):
+        return self._state.has_data(name)
+
     def _join_name(self, *names):
         return '.'.join(names)
 
