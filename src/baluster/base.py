@@ -1,5 +1,4 @@
 from asyncio import iscoroutinefunction, coroutine
-from collections import defaultdict
 from functools import partial
 from inspect import isclass
 import re
@@ -138,34 +137,16 @@ class Maker:
 class Manager:
 
     def __init__(self, managed):
-        self._managed = managed
-
-    # Delegate attribute lookup to internal obj
-    def __getattr__(self, name):
-        return getattr(self._managed, name)
-
-    # Delegate attribute assignment
-    def __setattr__(self, name, value):
-        if name.startswith('_'):
-            super().__setattr__(name, value)
-        else:
-            setattr(self._managed, name, value)
-
-    # Delegate attribute deletion
-    def __delattr__(self, name):
-        if name.startswith('_'):
-            raise AttributeError('Manager attributes cannot be deleted')
-        else:
-            delattr(self._managed, name)
+        self._managed = managed.__class__(managed._state.new_child())
 
     def __enter__(self):
-        return self
+        return self._managed
 
     def __exit__(self, exc_type, exc_value, traceback):
         self._managed.close()
 
     async def __aenter__(self):
-        return self
+        return self._managed
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self._managed.aclose()
@@ -176,10 +157,10 @@ class State:
     def __init__(
         self, resources=None, close_handlers=None, inject=None, params=None
     ):
-        self._resources = resources or dict()
-        self._close_handlers = close_handlers or []
-        self._inject = inject or dict()
-        self._params = params or dict()
+        self._resources = make_if_none(resources, dict())
+        self._close_handlers = make_if_none(close_handlers, [])
+        self._inject = make_if_none(inject, dict())
+        self._params = make_if_none(params, dict())
 
     def get_resource(self, key):
         return self._resources[key]
@@ -205,21 +186,25 @@ class State:
     def params(self):
         return self._params
 
+    def new_child(
+        self, resources=None
+    ):
+        if resources is None:
+            resources = dict(self._resources)
+        return self.__class__(
+            resources=resources,
+            close_handlers=[],
+            inject=self._inject,
+            params=self._params
+        )
+
     def partial_copy(self, include):
         resources = dict()
-        close_handlers = []
         for key, value in self._resources.items():
             for name in include:
                 if re.match('^{}$'.format(name), key):
                     resources[key] = value
-        for key, handler, resource in self._close_handlers:
-            for name in include:
-                if re.match('^{}$'.format(name), key):
-                    close_handlers.append((key, handler, resource))
-        return self.__class__(
-            resources, close_handlers, self.inject, self.params
-        )
-
+        return self.new_child(resources)
 
 
 class BaseHolder:
@@ -259,6 +244,8 @@ class BaseHolder:
                 handler(instance, self, resource)
             except Exception as ex:
                 exceptions.append(ex)
+        if len(exceptions) == 1:
+            raise exceptions[0]
         if exceptions:
             raise MultipleExceptions(exceptions)
 
@@ -273,6 +260,8 @@ class BaseHolder:
                     handler(instance, self, resource)
             except Exception as ex:
                 exceptions.append(ex)
+        if len(exceptions) == 1:
+            raise exceptions[0]
         if exceptions:
             raise MultipleExceptions(exceptions)
 
@@ -328,3 +317,9 @@ class MultipleExceptions(Exception):
     @property
     def exceptions(self):
         return self._exceptions
+
+
+def make_if_none(obj, default):
+    if obj is not None:
+        return obj
+    return default
