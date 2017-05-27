@@ -2,19 +2,24 @@ from asyncio import iscoroutinefunction, coroutine
 from functools import partial
 from inspect import isclass
 
-from .exceptions import MultipleExceptions
 from .manager import Manager
 from .state import State
+from .utils import (
+    capture_exceptions, as_async, make_caller, get_member_name,
+    find_instance
+)
 
 
 class ValueStoreProxy:
+
+    __slots__ = ('_instance', '_root', '_state', '_name', '_key', '_func')
 
     def __init__(self, name, instance, func):
         self._instance = instance
         self._root = instance._root
         self._state = self._root._state
         self._name = name
-        self._key = instance._get_member_name(name)
+        self._key = get_member_name(instance._name, name)
         self._func = partial(func, self._instance)
 
     @property
@@ -37,7 +42,7 @@ class ValueStoreProxy:
     def invalidate(self):
         self._state.del_resource(self._key)
 
-    def add_close_handler(self, handler, resource):
+    def add_close_handler(self, handler, resource=None):
         return self._state.add_close_handler(self._key, handler, resource)
 
     def get_args(self, args):
@@ -51,6 +56,11 @@ class ValueStoreProxy:
 
 
 class Maker:
+
+    __slots__ = (
+        '_owner', '_name', '_cache', '_readonly', '_inject', '_close_handler',
+        '_invalidate_after_closed', '_args', '_func'
+    )
 
     def __init__(
         self, func=None, *, cache=True, readonly=False, inject=None, args=None
@@ -68,25 +78,24 @@ class Maker:
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        getter = self._is_async and self._async_get or self._get
+        getter = self.is_async and self._async_get or self._get
         return getter(self._get_proxy(instance))
 
     def _get(self, proxy):
         if proxy.has():
             return proxy.get()
         value = proxy.func(*proxy.get_args(self._args))
-        if self._invalidate_after_closed:
-            proxy.add_close_handler(self.get_invalidator(proxy), value)
-        if self._close_handler:
-            proxy.add_close_handler(self._close_handler, value)
-        if self._cache:
-            proxy.save(value)
-        return value
+        return self._process_value(proxy, value)
 
     async def _async_get(self, proxy):
         if proxy.has():
             return proxy.get()
         value = await proxy.func(*proxy.get_args(self._args))
+        return self._process_value(proxy, value)
+
+    def _process_value(self, proxy, value):
+        if self._invalidate_after_closed:
+            proxy.add_close_handler(make_caller(proxy.invalidate))
         if self._close_handler:
             proxy.add_close_handler(self._close_handler, value)
         if self._cache:
@@ -120,7 +129,7 @@ class Maker:
         self._owner = owner
 
     @property
-    def _is_async(self):
+    def is_async(self):
         return iscoroutinefunction(self._func)
 
     def close(self, handler=None, *, invalidate=False):
@@ -132,20 +141,15 @@ class Maker:
             return inner
         return inner(handler)
 
-    def get_invalidator(self, proxy):
-        def invalidator(*args, **kwargs):
-            proxy.invalidate()
-        return invalidator
-
     def setup(self, instance):
         if self._inject is None:
             return
         proxy = self._get_proxy(instance)
-        if self._is_async:
+        if self.is_async:
             _getter = coroutine(partial(self._async_get, proxy))
         else:
             _getter = partial(self._get, proxy)
-        instance._root._state.inject[self._inject] = _getter
+        instance._root._state.set_inject(self._inject, _getter)
 
 
 class BaseHolder:
@@ -154,7 +158,7 @@ class BaseHolder:
         self._parent = _parent
         if _parent is not None:
             self._root = _parent._root
-            self._name = self._parent._get_member_name(_name)
+            self._name = get_member_name(self._parent._name, _name)
         else:
             self._root = self
             self._name = None
@@ -172,53 +176,26 @@ class BaseHolder:
     def __contains__(self, name):
         return self._state.has_data(name)
 
-    def _join_name(self, *names):
-        return '.'.join(names)
-
-    def _get_member_name(self, name):
-        if self._name is None:
-            return name
-        return self._join_name(self._name, name)
-
-    def _get_instance_by_name(self, name):
-        instance = self
-        for part in name.split('.')[:-1]:
-            instance = getattr(instance, part)
-        return instance
-
     def enter(self):
         return Manager(self.__class__(self._state.new_child()))
 
     def close(self):
-        exceptions = []
-        for key, handler, resource in reversed(self._state.close_handlers):
-            instance = self._get_instance_by_name(key)
-            try:
-                handler(instance, self, resource)
-            except Exception as ex:
-                exceptions.append(ex)
-        self._state.clear_close_handlers()
-        if len(exceptions) == 1:
-            raise exceptions[0]
-        if exceptions:
-            raise MultipleExceptions(exceptions)
+        handlers = self._state.get_close_handlers()
+        with capture_exceptions() as capture:
+            for key, handler, resource in handlers:
+                instance = find_instance(self, key)
+                with capture():
+                    handler(instance, self, resource)
+            self._state.clear_close_handlers()
 
     async def aclose(self):
-        exceptions = []
-        for key, handler, resource in reversed(self._state.close_handlers):
-            instance = self._get_instance_by_name(key)
-            try:
-                if iscoroutinefunction(handler):
-                    await handler(instance, self, resource)
-                else:
-                    handler(instance, self, resource)
-            except Exception as ex:
-                exceptions.append(ex)
-        self._state.clear_close_handlers()
-        if len(exceptions) == 1:
-            raise exceptions[0]
-        if exceptions:
-            raise MultipleExceptions(exceptions)
+        handlers = self._state.get_close_handlers()
+        with capture_exceptions() as capture:
+            for key, handler, resource in handlers:
+                instance = find_instance(self, key)
+                with capture():
+                    await as_async(handler, instance, self, resource)
+            self._state.clear_close_handlers()
 
     def partial_copy(self, *names):
         return self.__class__(self._state.partial_copy(names))
@@ -232,10 +209,7 @@ class BaseHolder:
         return inner(func)
 
     def inject_config(self, binder):
-        def get_lambda(maker):
-            return lambda: maker()
-        for key, maker in self._state.inject.items():
-            binder.bind_to_provider(key, get_lambda(maker))
+        self._state.map_inject_providers(binder.bind_to_provider)
 
 
 class HolderType(type):

@@ -3,6 +3,8 @@ from .exceptions import ContextManagerReusedError
 
 class Manager:
 
+    __slots__ = ('_managed', '_active')
+
     def __init__(self, managed):
         self._managed = managed
         self._active = False

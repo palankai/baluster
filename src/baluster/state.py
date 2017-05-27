@@ -1,31 +1,28 @@
 from collections import ChainMap
 
-from .utils import make_if_none, dict_partial_copy
+from .utils import make_if_none, dict_partial_copy, make_caller
 
 
-class State:
+class InjectState:
 
-    def __init__(
-        self, resources=None, close_handlers=None, inject=None, params=None,
-        data=None
-    ):
-        self._resources = make_if_none(resources, dict())
-        self._close_handlers = make_if_none(close_handlers, [])
+    def __init__(self, *, inject=None, **kwargs):
         self._inject = make_if_none(inject, dict())
-        self._params = make_if_none(params, dict())
+
+    def set_inject(self, name, provider):
+        self._inject[name] = make_caller(provider)
+
+    def map_inject_providers(self, function):
+        for args in self._inject.items():
+            function(*args)
+
+    def new_child_data(self, **kwargs):
+        return dict(inject=self._inject)
+
+
+class DataState:
+
+    def __init__(self, *, data=None, **kwargs):
         self._data = make_if_none(data, ChainMap(dict()))
-
-    def get_resource(self, key):
-        return self._resources[key]
-
-    def set_resource(self, key, value):
-        self._resources[key] = value
-
-    def has_resource(self, key):
-        return key in self._resources
-
-    def del_resource(self, key):
-        del self._resources[key]
 
     def get_data(self, name):
         return self._data[name]
@@ -39,36 +36,84 @@ class State:
     def has_data(self, name):
         return name in self._data
 
-    @property
-    def close_handlers(self):
-        return self._close_handlers
+    def new_child_data(self, **kwargs):
+        return dict(data=self._data.new_child())
+
+
+class ResourceState:
+
+    def __init__(self, *, resources=None, **kwargs):
+        self._resources = make_if_none(resources, dict())
+
+    def get_resource(self, key):
+        return self._resources[key]
+
+    def set_resource(self, key, value):
+        self._resources[key] = value
+
+    def has_resource(self, key):
+        return key in self._resources
+
+    def del_resource(self, key):
+        del self._resources[key]
+
+    def new_child_data(self, *, resources=None, **kwargs):
+        if resources is None:
+            resources = dict(self._resources)
+        return dict(resources=resources)
+
+    def filter_resources(self, patterns):
+        return dict_partial_copy(self._resources, patterns)
+
+
+class CloseHandlersState:
+
+    def __init__(self, *, close_handlers=None, **kwargs):
+        self._close_handlers = make_if_none(close_handlers, [])
 
     def add_close_handler(self, key, handler, resource):
         self._close_handlers.append((key, handler, resource))
 
+    def get_close_handlers(self):
+        return reversed(self._close_handlers)
+
     def clear_close_handlers(self):
         self._close_handlers = []
 
-    @property
-    def inject(self):
-        return self._inject
+    def new_child_data(self, **kwargs):
+        return dict(close_handlers=[])
+
+
+class ParamsState:
+
+    def __init__(self, *, params=None, **kwargs):
+        self._params = make_if_none(params, dict())
 
     @property
     def params(self):
         return self._params
 
-    def new_child(
-        self, resources=None
-    ):
-        if resources is None:
-            resources = dict(self._resources)
-        return self.__class__(
-            resources=resources,
-            close_handlers=[],
-            inject=self._inject,
-            params=self._params,
-            data=self._data.new_child()
-        )
+    def new_child_data(self, **kwargs):
+        return dict(params=self._params)
+
+
+mixtures = (
+    InjectState, DataState, ResourceState, CloseHandlersState, ParamsState
+)
+
+
+class State(*mixtures):
+
+    def __init__(self, **kwargs):
+        for mixture in mixtures:
+            mixture.__init__(self, **kwargs)
+
+    def new_child(self, **kwargs):
+        src = [m.new_child_data(self, **kwargs) for m in mixtures]
+        data = {}
+        for update in src:
+            data.update(update)
+        return self.__class__(**data)
 
     def partial_copy(self, patterns):
-        return self.new_child(dict_partial_copy(self._resources, patterns))
+        return self.new_child(resources=self.filter_resources(patterns))
