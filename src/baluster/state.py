@@ -1,6 +1,6 @@
 from collections import ChainMap
 
-from .utils import make_if_none, dict_partial_copy, make_caller
+from .utils import make_if_none, dict_partial_copy, make_caller, merge_dicts
 
 
 class InjectState:
@@ -89,9 +89,8 @@ class ParamsState:
     def __init__(self, *, params=None, **kwargs):
         self._params = make_if_none(params, dict())
 
-    @property
-    def params(self):
-        return self._params
+    def get_args(self, names, **extra):
+        return [self._params.get(n) or extra.get(n) for n in names]
 
     def new_child_data(self, **kwargs):
         return dict(params=self._params)
@@ -109,11 +108,9 @@ class State(*mixtures):
             mixture.__init__(self, **kwargs)
 
     def new_child(self, **kwargs):
-        src = [m.new_child_data(self, **kwargs) for m in mixtures]
-        data = {}
-        for update in src:
-            data.update(update)
-        return self.__class__(**data)
+        return self.__class__(**merge_dicts(
+            m.new_child_data(self, **kwargs) for m in mixtures
+        ))
 
     def partial_copy(self, patterns):
         return self.new_child(resources=self.filter_resources(patterns))

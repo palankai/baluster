@@ -1,4 +1,4 @@
-from asyncio import iscoroutinefunction, coroutine
+from asyncio import iscoroutinefunction
 from functools import partial
 from inspect import isclass
 
@@ -6,7 +6,7 @@ from .manager import Manager
 from .state import State
 from .utils import (
     capture_exceptions, as_async, make_caller, get_member_name,
-    find_instance
+    find_instance, async_partial
 )
 
 
@@ -46,13 +46,7 @@ class ValueStoreProxy:
         return self._state.add_close_handler(self._key, handler, resource)
 
     def get_args(self, args):
-        params = []
-        for name in args:
-            if name == 'root':
-                params.append(self.root)
-            else:
-                params.append(self.root._state.params.get(name))
-        return params
+        return tuple(self.root._state.get_args(args, root=self._root))
 
 
 class Maker:
@@ -146,7 +140,7 @@ class Maker:
             return
         proxy = self._get_proxy(instance)
         if self.is_async:
-            _getter = coroutine(partial(self._async_get, proxy))
+            _getter = async_partial(self._async_get, proxy)
         else:
             _getter = partial(self._get, proxy)
         instance._root._state.set_inject(self._inject, _getter)

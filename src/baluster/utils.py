@@ -1,5 +1,6 @@
-from asyncio import iscoroutinefunction
+from asyncio import iscoroutinefunction, coroutine
 from contextlib import contextmanager
+from functools import partial
 import re
 
 from .exceptions import MultipleExceptions
@@ -42,18 +43,22 @@ async def as_async(func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
+def async_partial(*args, **kwargs):
+    return coroutine(partial(*args, **kwargs))
+
+
 def make_caller(what_to_call):
     return lambda *a, **k: what_to_call()
 
 
-def join_names(*names):
-    return '.'.join(names)
+def merge_dicts(dicts):
+    return {k: v for d in dicts for k, v in d.items()}
 
 
 def get_member_name(own_name, name):
     if own_name is None:
         return name
-    return join_names(own_name, name)
+    return _join_names(own_name, name)
 
 
 def find_instance(tree, name):
@@ -61,6 +66,10 @@ def find_instance(tree, name):
     for part in name.split('.')[:-1]:
         instance = getattr(instance, part)
     return instance
+
+
+def _join_names(*names):
+    return '.'.join(names)
 
 
 def _find_matches(patterns, candidates):
