@@ -44,6 +44,17 @@ class CompositeRoot(Holder):
         resource.disconnect()
 
     @Holder.factory
+    def resource_invalidated(self, root):
+        res = Resource()
+        return res
+
+    @resource_invalidated.close(invalidate=True)
+    def close_resource_invalidated(self, root, resource):
+        assert resource.connected is True
+        assert root.resource_invalidated.connected is True
+        resource.disconnect()
+
+    @Holder.factory
     def value(self, root):
         return 'initial value'
 
@@ -109,6 +120,15 @@ class TestManager:
 
         assert ctx.resource.connected is False
         ctx.close()
+
+    def test_invalidate_resource(self):
+
+        root = CompositeRoot()
+
+        with root.enter() as ctx:
+            ctx.resource_invalidated.connect()
+
+        assert ctx.resource_invalidated.connected is None
 
     def test_reusing_ctx(self):
 

@@ -31,6 +31,9 @@ class ValueStoreProxy:
     def has(self):
         return self._state.has_resource(self._key)
 
+    def invalidate(self):
+        self._state.del_resource(self._key)
+
     def add_close_handler(self, handler, resource):
         return self._state.add_close_handler(self._key, handler, resource)
 
@@ -55,6 +58,7 @@ class Maker:
         self._readonly = readonly
         self._inject = inject
         self._close_handler = None
+        self._invalidate_after_closed = False
         self._args = args or ['root']
         if func is not None:
             self(func)
@@ -73,6 +77,8 @@ class Maker:
         if proxy.has():
             return proxy.get()
         value = proxy.func(*proxy.get_args(self._args))
+        if self._invalidate_after_closed:
+            proxy.add_close_handler(self.get_invalidator(proxy), value)
         if self._close_handler:
             proxy.add_close_handler(self._close_handler, value)
         if self._cache:
@@ -119,9 +125,19 @@ class Maker:
     def _is_async(self):
         return iscoroutinefunction(self._func)
 
-    def close(self, handler):
-        self._close_handler = handler
-        return handler
+    def close(self, handler=None, *, invalidate=False):
+        def inner(f):
+            self._invalidate_after_closed = invalidate
+            self._close_handler = f
+            return f
+        if handler is None:
+            return inner
+        return inner(handler)
+
+    def get_invalidator(self, proxy):
+        def invalidator(*args, **kwargs):
+            proxy.invalidate()
+        return invalidator
 
     def setup(self, instance):
         if self._inject is None:
@@ -175,6 +191,9 @@ class State:
 
     def has_resource(self, key):
         return key in self._resources
+
+    def del_resource(self, key):
+        del self._resources[key]
 
     @property
     def close_handlers(self):
