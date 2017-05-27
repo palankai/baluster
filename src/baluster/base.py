@@ -10,6 +10,7 @@ class ValueStoreProxy:
     def __init__(self, name, instance, func):
         self._instance = instance
         self._root = instance._root
+        self._state = self._root._state
         self._name = name
         self._key = instance._get_member_name(name)
         self._func = partial(func, self._instance)
@@ -23,16 +24,16 @@ class ValueStoreProxy:
         return self._root
 
     def get(self):
-        return self._root._resources[self._key]
+        return self._state.get_resource(self._key)
 
     def save(self, value):
-        self._root._resources[self._key] = value
+        return self._state.set_resource(self._key, value)
 
     def has(self):
-        return self._key in self._root._resources
+        return self._state.has_resource(self._key)
 
     def add_close_handler(self, handler, resource):
-        self._root._close_handlers.append((self._key, handler, resource))
+        return self._state.add_close_handler(self._key, handler, resource)
 
     def get_args(self, args):
         params = []
@@ -40,7 +41,7 @@ class ValueStoreProxy:
             if name == 'root':
                 params.append(self.root)
             else:
-                params.append(self.root._params.get(name))
+                params.append(self.root._state.params.get(name))
         return params
 
 
@@ -131,7 +132,7 @@ class Maker:
             _getter = coroutine(partial(self._async_get, proxy))
         else:
             _getter = partial(self._get, proxy)
-        instance._root._inject[self._inject] = _getter
+        instance._root._state.inject[self._inject] = _getter
 
 
 class Manager:
@@ -170,12 +171,60 @@ class Manager:
         await self._managed.aclose()
 
 
-class BaseHolder:
+class State:
 
     def __init__(
-        self, _parent=None, _name=None, _resources=None, _inject=None,
-        _handlers=None, _close_handlers=None, **params
+        self, resources=None, close_handlers=None, inject=None, params=None
     ):
+        self._resources = resources or dict()
+        self._close_handlers = close_handlers or []
+        self._inject = inject or dict()
+        self._params = params or dict()
+
+    def get_resource(self, key):
+        return self._resources[key]
+
+    def set_resource(self, key, value):
+        self._resources[key] = value
+
+    def has_resource(self, key):
+        return key in self._resources
+
+    @property
+    def close_handlers(self):
+        return self._close_handlers
+
+    def add_close_handler(self, key, handler, resource):
+        self._close_handlers.append((key, handler, resource))
+
+    @property
+    def inject(self):
+        return self._inject
+
+    @property
+    def params(self):
+        return self._params
+
+    def partial_copy(self, include):
+        resources = dict()
+        close_handlers = []
+        for key, value in self._resources.items():
+            for name in include:
+                if re.match('^{}$'.format(name), key):
+                    resources[key] = value
+        for key, handler, resource in self._close_handlers:
+            for name in include:
+                if re.match('^{}$'.format(name), key):
+                    close_handlers.append((key, handler, resource))
+        return self.__class__(
+            resources, close_handlers, self.inject, self.params
+        )
+
+
+
+class BaseHolder:
+
+    def __init__(self, _state=None, _parent=None, _name=None, **params):
         self._parent = _parent
         if _parent is not None:
             self._root = _parent._root
@@ -183,11 +232,7 @@ class BaseHolder:
         else:
             self._root = self
             self._name = None
-            self._resources = _resources or dict()
-            self._inject = _inject or dict()
-            self._close_handlers = _close_handlers or []
-            self._handlers = _handlers or defaultdict(list)
-            self._params = params
+            self._state = _state or State(params=params)
 
     def _join_name(self, *names):
         return '.'.join(names)
@@ -208,7 +253,7 @@ class BaseHolder:
 
     def close(self):
         exceptions = []
-        for key, handler, resource in reversed(self._close_handlers):
+        for key, handler, resource in reversed(self._state.close_handlers):
             instance = self._get_instance_by_name(key)
             try:
                 handler(instance, self, resource)
@@ -219,7 +264,7 @@ class BaseHolder:
 
     async def aclose(self):
         exceptions = []
-        for key, handler, resource in reversed(self._close_handlers):
+        for key, handler, resource in reversed(self._state.close_handlers):
             instance = self._get_instance_by_name(key)
             try:
                 if iscoroutinefunction(handler):
@@ -232,22 +277,7 @@ class BaseHolder:
             raise MultipleExceptions(exceptions)
 
     def partial_copy(self, *names):
-        _inject = self._inject
-        _handlers = self._handlers
-        _resources = dict()
-        _close_handlers = []
-        for key, value in self._resources.items():
-            for name in names:
-                if re.match('^{}$'.format(name), key):
-                    _resources[key] = value
-        for key, handler, resource in self._close_handlers:
-            for name in names:
-                if re.match('^{}$'.format(name), key):
-                    _close_handlers.append((key, handler, resource))
-        return self.__class__(
-            _inject=_inject, _handlers=_handlers, _resources=_resources,
-            _close_handlers=_close_handlers, **self._params
-        )
+        return self.__class__(self._state.partial_copy(names))
 
     @staticmethod
     def factory(func=None, **kwargs):
@@ -256,7 +286,7 @@ class BaseHolder:
     def inject_config(self, binder):
         def get_lambda(maker):
             return lambda: maker()
-        for key, maker in self._inject.items():
+        for key, maker in self._state.inject.items():
             binder.bind_to_provider(key, get_lambda(maker))
 
 
