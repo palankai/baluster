@@ -1,3 +1,4 @@
+from collections import ChainMap
 import re
 
 from .utils import make_if_none
@@ -6,12 +7,14 @@ from .utils import make_if_none
 class State:
 
     def __init__(
-        self, resources=None, close_handlers=None, inject=None, params=None
+        self, resources=None, close_handlers=None, inject=None, params=None,
+        data=None
     ):
         self._resources = make_if_none(resources, dict())
         self._close_handlers = make_if_none(close_handlers, [])
         self._inject = make_if_none(inject, dict())
         self._params = make_if_none(params, dict())
+        self._data = make_if_none(data, ChainMap(dict()))
 
     def get_resource(self, key):
         return self._resources[key]
@@ -24,6 +27,18 @@ class State:
 
     def del_resource(self, key):
         del self._resources[key]
+
+    def get_data(self, name):
+        return self._data[name]
+
+    def set_data(self, name, value):
+        self._data[name] = value
+
+    def del_data(self, name):
+        del self._data[name]
+
+    def has_data(self, name):
+        return name in self._data
 
     @property
     def close_handlers(self):
@@ -52,7 +67,8 @@ class State:
             resources=resources,
             close_handlers=[],
             inject=self._inject,
-            params=self._params
+            params=self._params,
+            data=self._data.new_child()
         )
 
     def partial_copy(self, include):
