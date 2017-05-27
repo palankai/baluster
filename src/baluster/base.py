@@ -160,6 +160,12 @@ class BaseHolder:
             self._name = None
             self._state = _state or State(params=params)
 
+    def __getitem__(self, name):
+        return self._state.get_data(name)
+
+    def __setitem__(self, name, value):
+        self._state.set_data(name, value)
+
     def _join_name(self, *names):
         return '.'.join(names)
 
