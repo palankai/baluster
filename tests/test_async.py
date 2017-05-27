@@ -142,11 +142,11 @@ class TestAsync:
 
     @pytest.mark.asyncio
     async def test_closed_without_invoke(self):
-        obj = SampleAsync()
+        root = SampleAsync()
         exception_raised = False
 
         try:
-            async with obj:
+            async with root.enter() as obj:
                 raise ZeroDivisionError()
         except ZeroDivisionError:
             exception_raised = True
@@ -156,11 +156,11 @@ class TestAsync:
 
     @pytest.mark.asyncio
     async def test_closed_with_invoke(self):
-        obj = SampleAsync()
+        root = SampleAsync()
         exception_raised = False
 
         try:
-            async with obj:
+            async with root.enter() as obj:
                 obj.resource
                 await obj.async_resource
                 await obj.async_resource
