@@ -9,9 +9,11 @@ class Resource:
         self.connected = None
 
     def connect(self):
+        assert self.connected is not True
         self.connected = True
 
     def disconnect(self):
+        assert self.connected is True
         self.connected = False
 
 
@@ -97,3 +99,13 @@ class TestManager:
             assert root.resource.connected is None
 
         assert ctx.resource.connected is False
+
+    def test_closing_resource_twice(self):
+
+        root = CompositeRoot()
+
+        with root.enter() as ctx:
+            ctx.resource.connect()
+
+        assert ctx.resource.connected is False
+        ctx.close()

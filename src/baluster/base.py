@@ -178,6 +178,9 @@ class State:
     def add_close_handler(self, key, handler, resource):
         self._close_handlers.append((key, handler, resource))
 
+    def clear_close_handlers(self):
+        self._close_handlers = []
+
     @property
     def inject(self):
         return self._inject
@@ -244,6 +247,7 @@ class BaseHolder:
                 handler(instance, self, resource)
             except Exception as ex:
                 exceptions.append(ex)
+        self._state.clear_close_handlers()
         if len(exceptions) == 1:
             raise exceptions[0]
         if exceptions:
@@ -260,6 +264,7 @@ class BaseHolder:
                     handler(instance, self, resource)
             except Exception as ex:
                 exceptions.append(ex)
+        self._state.clear_close_handlers()
         if len(exceptions) == 1:
             raise exceptions[0]
         if exceptions:
