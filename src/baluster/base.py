@@ -1,7 +1,10 @@
 from asyncio import iscoroutinefunction, coroutine
 from functools import partial
 from inspect import isclass
-import re
+
+from .exceptions import MultipleExceptions
+from .manager import Manager
+from .state import State
 
 
 class ValueStoreProxy:
@@ -60,12 +63,7 @@ class Maker:
         self._close_handler = None
         self._invalidate_after_closed = False
         self._args = args or ['root']
-        if func is not None:
-            self(func)
-
-    def __call__(self, func):
         self._func = func
-        return self
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -150,90 +148,6 @@ class Maker:
         instance._root._state.inject[self._inject] = _getter
 
 
-class Manager:
-
-    def __init__(self, managed):
-        self._managed = managed.__class__(managed._state.new_child())
-        self._active = False
-
-    def __enter__(self):
-        if self._active is True:
-            raise ContextManagerReusedError()
-        self._active = True
-        return self._managed
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self._active = False
-        self._managed.close()
-
-    async def __aenter__(self):
-        return self._managed
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self._managed.aclose()
-
-
-class State:
-
-    def __init__(
-        self, resources=None, close_handlers=None, inject=None, params=None
-    ):
-        self._resources = make_if_none(resources, dict())
-        self._close_handlers = make_if_none(close_handlers, [])
-        self._inject = make_if_none(inject, dict())
-        self._params = make_if_none(params, dict())
-
-    def get_resource(self, key):
-        return self._resources[key]
-
-    def set_resource(self, key, value):
-        self._resources[key] = value
-
-    def has_resource(self, key):
-        return key in self._resources
-
-    def del_resource(self, key):
-        del self._resources[key]
-
-    @property
-    def close_handlers(self):
-        return self._close_handlers
-
-    def add_close_handler(self, key, handler, resource):
-        self._close_handlers.append((key, handler, resource))
-
-    def clear_close_handlers(self):
-        self._close_handlers = []
-
-    @property
-    def inject(self):
-        return self._inject
-
-    @property
-    def params(self):
-        return self._params
-
-    def new_child(
-        self, resources=None
-    ):
-        if resources is None:
-            resources = dict(self._resources)
-        return self.__class__(
-            resources=resources,
-            close_handlers=[],
-            inject=self._inject,
-            params=self._params
-        )
-
-    def partial_copy(self, include):
-        resources = dict()
-        for key, value in self._resources.items():
-            for name in include:
-                if re.match('^{}$'.format(name), key):
-                    resources[key] = value
-        return self.new_child(resources)
-
-
 class BaseHolder:
 
     def __init__(self, _state=None, _parent=None, _name=None, **params):
@@ -261,7 +175,7 @@ class BaseHolder:
         return instance
 
     def enter(self):
-        return Manager(self)
+        return Manager(self.__class__(self._state.new_child()))
 
     def close(self):
         exceptions = []
@@ -299,7 +213,11 @@ class BaseHolder:
 
     @staticmethod
     def factory(func=None, **kwargs):
-        return Maker(func, **kwargs)
+        def inner(f):
+            return Maker(f, **kwargs)
+        if func is None:
+            return inner
+        return inner(func)
 
     def inject_config(self, binder):
         def get_lambda(maker):
@@ -335,24 +253,3 @@ class Holder(BaseHolder, metaclass=HolderType):
             setattr(self, name, nested(_parent=self, _name=name))
         for maker in self._makers:
             maker.setup(self)
-
-
-class MultipleExceptions(Exception):
-
-    def __init__(self, exceptions):
-        self._exceptions = exceptions
-        super().__init__('Multiple exceptions occured')
-
-    @property
-    def exceptions(self):
-        return self._exceptions
-
-
-class ContextManagerReusedError(Exception):
-    pass
-
-
-def make_if_none(obj, default):
-    if obj is not None:
-        return obj
-    return default
