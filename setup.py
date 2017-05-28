@@ -27,7 +27,7 @@ if __name__ == '__main__':
         long_description=read('README.rst'),
         url='https://gitlab.com/palankai/baluster',
         classifiers=[
-            'Development Status :: 4 - Beta',
+            'Development Status :: 3 - Alpha',
             'Intended Audience :: Developers',
             'License :: OSI Approved :: MIT License',
             'Natural Language :: English',
