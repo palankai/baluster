@@ -1,3 +1,4 @@
+from collections import namedtuple
 from asyncio import iscoroutinefunction
 from functools import partial
 from inspect import isclass
@@ -10,16 +11,19 @@ from .utils import (
 )
 
 
+BalusterExtract = namedtuple('BalusterExtract', ['root', 'state', 'name'])
+
+
 class Mediator:
 
     __slots__ = ('_instance', '_root', '_state', '_name', '_key')
 
-    def __init__(self, name, instance):
-        self._instance = instance
-        self._root = instance._root
-        self._state = self._root._state
+    def __init__(self, name, instance, extract):
         self._name = name
-        self._key = get_member_name(instance._name, name)
+        self._instance = instance
+        self._root = extract(instance).root
+        self._state = extract(instance).state
+        self._key = get_member_name(extract(instance).name, name)
 
     @property
     def root(self):
@@ -67,7 +71,10 @@ class BaseMaker:
     def get_mediator(self, instance):
         return self._mediator_factory(self._name, instance)
 
-    def setup(self, instance, mediator_factory):
+    def init(self, instance):
+        pass
+
+    def bind(self, mediator_factory):
         self._mediator_factory = mediator_factory
 
 
@@ -105,7 +112,7 @@ class ValueMaker(BaseMaker):
         mediator.save(value)
 
 
-class Maker(BaseMaker):
+class FactoryMaker(BaseMaker):
 
     __slots__ = (
         '_cache', '_readonly', '_inject', '_close_handler',
@@ -187,8 +194,8 @@ class Maker(BaseMaker):
             return async_partial(self._async_get, mediator)
         return partial(self._get, mediator)
 
-    def setup(self, instance, mediator_factory):
-        super().setup(instance, mediator_factory)
+    def init(self, instance):
+        super().init(instance)
         if self._inject is None:
             return
         mediator = self.get_mediator(instance)
@@ -197,11 +204,14 @@ class Maker(BaseMaker):
 
 class BaseHolder:
 
-    def __init__(self, _state=None, _parent=None, _name=None, **params):
+    def __init__(self, _state=None, _parent=None, **params):
         self._parent = _parent
         if _parent is not None:
             self._root = _parent._root
-            self._name = get_member_name(self._parent._name, _name)
+            self._name = get_member_name(
+                self._parent._name,
+                self.__class__.__name__
+            )
         else:
             self._root = self
             self._name = None
@@ -243,14 +253,6 @@ class BaseHolder:
     def partial_copy(self, *names):
         return self.__class__(self._state.partial_copy(names))
 
-    @staticmethod
-    def factory(func=None, **kwargs):
-        def inner(f):
-            return Maker(f, **kwargs)
-        if func is None:
-            return inner
-        return inner(func)
-
     def inject_config(self, binder):
         self._state.map_inject_providers(binder.bind_to_provider)
 
@@ -276,9 +278,23 @@ class HolderType(type):
 
 class Holder(BaseHolder, metaclass=HolderType):
 
+    def __new__(cls, *args, **kwargs):
+
+        def extract(instance):
+            return BalusterExtract(
+                instance._root, instance._root._state, instance._name
+            )
+
+        def mediator_factory(name, instance):
+            return Mediator(name, instance, extract)
+
+        for maker in cls._makers:
+            maker.bind(mediator_factory)
+        return super(Holder, cls).__new__(cls)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name, nested in self._nested:
-            setattr(self, name, nested(_parent=self, _name=name))
+            setattr(self, name, nested(_parent=self))
         for maker in self._makers:
-            maker.setup(self, Mediator)
+            maker.init(self)

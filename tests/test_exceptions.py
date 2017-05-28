@@ -1,6 +1,6 @@
 import pytest
 
-from baluster import Holder, MultipleExceptions
+from baluster import Holder, MultipleExceptions, placeholders
 
 
 class CompositeRoot(Holder):
@@ -8,7 +8,7 @@ class CompositeRoot(Holder):
     resource_closed = False
     async_resource_closed = False
 
-    @Holder.factory
+    @placeholders.factory
     def buggy_resource(self, root):
         return True
 
@@ -16,7 +16,7 @@ class CompositeRoot(Holder):
     def close_buggy_resource(self, root, resource):
         raise NotImplementedError()
 
-    @Holder.factory
+    @placeholders.factory
     def other_buggy_resource(self, root):
         return True
 
@@ -24,7 +24,7 @@ class CompositeRoot(Holder):
     def close_other_buggy_resource(self, root, resource):
         raise NotImplementedError()
 
-    @Holder.factory
+    @placeholders.factory
     def resource(self, root):
         return True
 
@@ -32,7 +32,7 @@ class CompositeRoot(Holder):
     def close_resource(self, root, resource):
         self.resource_closed = True
 
-    @Holder.factory
+    @placeholders.factory
     async def buggy_async_resource(self, root):
         return True
 
@@ -40,7 +40,7 @@ class CompositeRoot(Holder):
     async def close_buggy_async_resource(self, root, resource):
         raise NotImplementedError()
 
-    @Holder.factory
+    @placeholders.factory
     async def async_resource(self, root):
         return True
 

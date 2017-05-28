@@ -1,4 +1,4 @@
-from baluster import Holder
+from baluster import Holder, placeholders
 
 
 class Root(Holder):
@@ -9,19 +9,19 @@ class Root(Holder):
 
     class foo(Holder):
 
-        @Holder.factory
+        @placeholders.factory
         def foo(self, root):
             root._called.append('foo.foo')
             return 1
 
-        @Holder.factory
+        @placeholders.factory
         def bar(self, root):
             root._called.append('foo.bar')
             return 1
 
     class foobar(Holder):
 
-        @Holder.factory
+        @placeholders.factory
         def bar(self, root):
             root._called.append('foobar.bar')
             return 1
