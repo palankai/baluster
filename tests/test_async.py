@@ -103,6 +103,9 @@ class SampleAsync(AsyncBaluster):
 
 class TestAsync:
 
+    def test_class_level_access(self):
+        assert SampleAsync.async_resource._name == 'async_resource'
+
     @pytest.mark.asyncio
     async def test_top_level_access(self):
         obj = SampleAsync()

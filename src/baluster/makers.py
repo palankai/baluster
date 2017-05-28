@@ -1,4 +1,3 @@
-from asyncio import iscoroutinefunction
 from functools import partial
 
 from .utils import make_caller, async_partial, Undefined
@@ -79,19 +78,12 @@ class FactoryMaker(BaseMaker):
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        getter = self.is_async and self._async_get or self._get
-        return getter(self.get_mediator(instance))
+        return self._get(self.get_mediator(instance))
 
     def _get(self, mediator):
         if mediator.has():
             return mediator.get()
         value = self._get_func(mediator)
-        return self._process_value(mediator, value)
-
-    async def _async_get(self, mediator):
-        if mediator.has():
-            return mediator.get()
-        value = await self._get_func(mediator)
         return self._process_value(mediator, value)
 
     def _get_func(self, mediator):
@@ -122,10 +114,6 @@ class FactoryMaker(BaseMaker):
             )
         mediator.save(value)
 
-    @property
-    def is_async(self):
-        return iscoroutinefunction(self._func)
-
     def close(self, handler=None, *, invalidate=False):
         def inner(f):
             self._invalidate_after_closed = invalidate
@@ -136,8 +124,6 @@ class FactoryMaker(BaseMaker):
         return inner(handler)
 
     def get_injectable(self, mediator):
-        if self.is_async:
-            return async_partial(self._async_get, mediator)
         return partial(self._get, mediator)
 
     def init(self, instance):
@@ -146,3 +132,22 @@ class FactoryMaker(BaseMaker):
             return
         mediator = self.get_mediator(instance)
         mediator.set_inject(self._inject, self.get_injectable(mediator))
+
+
+class AsyncFactoryMaker(FactoryMaker):
+
+    __slots__ = ()
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return self._get(self.get_mediator(instance))
+
+    async def _get(self, mediator):
+        if mediator.has():
+            return mediator.get()
+        value = await self._get_func(mediator)
+        return self._process_value(mediator, value)
+
+    def get_injectable(self, mediator):
+        return async_partial(self._get, mediator)
