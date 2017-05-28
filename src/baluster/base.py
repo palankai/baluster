@@ -6,28 +6,28 @@ from .manager import Manager
 from .state import State
 from .utils import (
     capture_exceptions, as_async, make_caller, get_member_name,
-    find_instance, async_partial
+    find_instance, async_partial, Undefined
 )
 
 
-class ValueStoreProxy:
+class Mediator:
 
-    __slots__ = ('_root', '_state', '_name', '_key', '_func')
+    __slots__ = ('_instance', '_root', '_state', '_name', '_key')
 
-    def __init__(self, name, instance, func):
+    def __init__(self, name, instance):
+        self._instance = instance
         self._root = instance._root
         self._state = self._root._state
         self._name = name
         self._key = get_member_name(instance._name, name)
-        self._func = partial(func, instance)
-
-    @property
-    def func(self):
-        return self._func
 
     @property
     def root(self):
         return self._root
+
+    @property
+    def instance(self):
+        return self._instance
 
     def get(self):
         return self._state.get_resource(self._key)
@@ -45,21 +45,76 @@ class ValueStoreProxy:
         return self._state.add_close_handler(self._key, handler, resource)
 
     def get_args(self, args):
-        return tuple(self.root._state.get_args(args, root=self._root))
+        return (
+            (self.instance,) +
+            tuple(self.root._state.get_args(args, root=self._root))
+        )
+
+    def set_inject(self, name, injectable):
+        self._state.set_inject(name, injectable)
 
 
-class Maker:
+class BaseMaker:
+
+    __slots__ = ('_name', '_mediator_factory')
+
+    def __delete__(self, instance):
+        raise AttributeError('Attribute cannot be deleted')
+
+    def __set_name__(self, owner, name):
+        self._name = name
+
+    def get_mediator(self, instance):
+        return self._mediator_factory(self._name, instance)
+
+    def setup(self, instance, mediator_factory):
+        self._mediator_factory = mediator_factory
+
+
+class ValueMaker(BaseMaker):
+
+    __slots__ = ('_default', )
+
+    def __init__(self, default=Undefined):
+        self._name = None
+        self._default = default
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        mediator = self.get_mediator(instance)
+        if mediator.has():
+            return mediator.get()
+        if self._default == Undefined:
+            raise AttributeError()
+        if callable(self._default):
+            value = self._default()
+        else:
+            value = self._default
+        mediator.save(value)
+        return value
+
+    def __set__(self, instance, value):
+        mediator = self.get_mediator(instance)
+        if mediator.has():
+            raise AttributeError(
+                'The value `{name}` has already been set'.format(
+                    name=self._name
+                )
+            )
+        mediator.save(value)
+
+
+class Maker(BaseMaker):
 
     __slots__ = (
-        '_owner', '_name', '_cache', '_readonly', '_inject', '_close_handler',
+        '_cache', '_readonly', '_inject', '_close_handler',
         '_invalidate_after_closed', '_args', '_func'
     )
 
     def __init__(
         self, func=None, *, cache=True, readonly=False, inject=None, args=None
     ):
-        self._owner = None
-        self._name = None
         self._cache = cache
         self._readonly = readonly
         self._inject = inject
@@ -72,35 +127,35 @@ class Maker:
         if instance is None:
             return self
         getter = self.is_async and self._async_get or self._get
-        return getter(self._get_proxy(instance))
+        return getter(self.get_mediator(instance))
 
-    def _get(self, proxy):
-        if proxy.has():
-            return proxy.get()
-        value = self._get_func(proxy)
-        return self._process_value(proxy, value)
+    def _get(self, mediator):
+        if mediator.has():
+            return mediator.get()
+        value = self._get_func(mediator)
+        return self._process_value(mediator, value)
 
-    async def _async_get(self, proxy):
-        if proxy.has():
-            return proxy.get()
-        value = await self._get_func(proxy)
-        return self._process_value(proxy, value)
+    async def _async_get(self, mediator):
+        if mediator.has():
+            return mediator.get()
+        value = await self._get_func(mediator)
+        return self._process_value(mediator, value)
 
-    def _get_func(self, proxy):
-        return proxy.func(*proxy.get_args(self._args))
+    def _get_func(self, mediator):
+        return self._func(*mediator.get_args(self._args))
 
-    def _process_value(self, proxy, value):
+    def _process_value(self, mediator, value):
         if self._invalidate_after_closed:
-            proxy.add_close_handler(make_caller(proxy.invalidate))
+            mediator.add_close_handler(make_caller(mediator.invalidate))
         if self._close_handler:
-            proxy.add_close_handler(self._close_handler, value)
+            mediator.add_close_handler(self._close_handler, value)
         if self._cache:
-            proxy.save(value)
+            mediator.save(value)
         return value
 
     def __set__(self, instance, value):
-        proxy = self._get_proxy(instance)
-        if proxy.has():
+        mediator = self.get_mediator(instance)
+        if mediator.has():
             raise AttributeError(
                 'The value `{name}` has already been set'.format(
                     name=self._name
@@ -112,17 +167,7 @@ class Maker:
                     name=self._name
                 )
             )
-        proxy.save(value)
-
-    def _get_proxy(self, instance):
-        return ValueStoreProxy(self._name, instance, self._func)
-
-    def __delete__(self, instance):
-        raise AttributeError('Attribute cannot be deleted')
-
-    def __set_name__(self, owner, name):
-        self._name = name
-        self._owner = owner
+        mediator.save(value)
 
     @property
     def is_async(self):
@@ -137,16 +182,17 @@ class Maker:
             return inner
         return inner(handler)
 
-    def get_injectable(self, instance):
-        proxy = self._get_proxy(instance)
+    def get_injectable(self, mediator):
         if self.is_async:
-            return async_partial(self._async_get, proxy)
-        return partial(self._get, proxy)
+            return async_partial(self._async_get, mediator)
+        return partial(self._get, mediator)
 
-    def setup(self, instance, state):
+    def setup(self, instance, mediator_factory):
+        super().setup(instance, mediator_factory)
         if self._inject is None:
             return
-        state.set_inject(self._inject, self.get_injectable(instance))
+        mediator = self.get_mediator(instance)
+        mediator.set_inject(self._inject, self.get_injectable(mediator))
 
 
 class BaseHolder:
@@ -217,7 +263,7 @@ class HolderType(type):
         members = dict()
 
         for k, v in defined_members.items():
-            if isinstance(v, Maker):
+            if isinstance(v, BaseMaker):
                 makers.append(v)
             if isclass(v) and issubclass(v, BaseHolder):
                 nested.append((k, v))
@@ -235,4 +281,4 @@ class Holder(BaseHolder, metaclass=HolderType):
         for name, nested in self._nested:
             setattr(self, name, nested(_parent=self, _name=name))
         for maker in self._makers:
-            maker.setup(self, self._root._state)
+            maker.setup(self, Mediator)

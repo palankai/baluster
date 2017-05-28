@@ -6,6 +6,10 @@ import re
 from .exceptions import MultipleExceptions
 
 
+class Undefined:
+    pass
+
+
 def make_if_none(obj, default):
     if obj is not None:
         return obj

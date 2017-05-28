@@ -1,6 +1,6 @@
 import pytest
 
-from baluster import Holder
+from baluster import Holder, factories
 
 
 class CompositeRootCase(Holder):
@@ -9,6 +9,10 @@ class CompositeRootCase(Holder):
     _closed = False
 
     _closed_resources = None
+
+    place = factories.placeholder()
+    place_with_default = factories.placeholder(1)
+    place_with_callable = factories.placeholder(lambda: 1)
 
     @Holder.factory
     def value(self, root):
@@ -46,6 +50,32 @@ class CompositeRootCase(Holder):
         if self._closed_resources is None:
             self._closed_resources = []
         self._closed_resources.append(resource)
+
+
+class TestPlaceholder:
+
+    def test_getter(self):
+        root = CompositeRootCase()
+
+        with pytest.raises(AttributeError):
+            assert root.place is None
+        root.place = 'New value'
+
+        assert root.place == 'New value'
+
+        assert root.place_with_default == 1
+        assert root.place_with_callable == 1
+
+    def test_class_level_access(self):
+        assert CompositeRootCase.place._name == 'place'
+
+    def test_set_new_value(self):
+        root = CompositeRootCase()
+
+        root.place = 'New value'
+
+        with pytest.raises(AttributeError):
+            root.place = 'Other value'
 
 
 class TestHolder:
