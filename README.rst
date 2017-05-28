@@ -28,11 +28,11 @@ Example - composie root
 
 .. code:: python
 
-    from baluster import Holder
+    from baluster import Baluster, placeholders
     import psycopg2
 
-    class ApplicationRoot(Holder):
-        @Holder.factory
+    class ApplicationRoot(Baluster):
+        @placeholders.factory
         def db(self, root):
             # Will be called at the first use
             # Will be cached so won't be called again
@@ -42,7 +42,7 @@ Example - composie root
         def _close_db(self, root, db):
             db.close()
 
-        @Holder.factory
+        @placeholders.factory
         def cr(self, root):
             return self.db.cursor()
 
@@ -64,11 +64,11 @@ Example - async composie root
 
 .. code:: python
 
-    from baluster import Holder
+    from baluster import Baluster, placeholders
 
-    class AsyncApplicationRoot(Holder):
+    class AsyncApplicationRoot(Baluster):
 
-        @Holder.factory
+        @placeholders.factory
         async def resource(self, root):
             # Will be called at the first use
             # Will be cached so won't be called again
@@ -93,39 +93,39 @@ Example - fixture factory for tests
 
 .. code:: python
 
-    from baluster import Holder
+    from baluster import Baluster, placeholders
     import psycopg2
 
-    class Fixtures(Holder):
+    class Fixtures(Baluster):
 
-        @Holder.factory
+        @placeholders.factory
         def cr(self, root):
             conn = psycopg2.connect("dbname=test user=postgres")
             return conn.cursor()
 
-        class users(Holder):
+        class users(Baluster):
 
-            @Holder.factory
+            @placeholders.factory
             def user(self, root):
                 root.cr.execute('SELECT * FROM user WHERE id=1')
                 return User(root.cr.fetchone())
 
-            @Holder.factory
+            @placeholders.factory
             def customer(self, root):
                 root.cr.execute('SELECT * FROM customer WHERE id=1')
                 return Customer(root.cr.fetchone())
 
-        class orders(Holder):
+        class orders(Baluster):
 
-            @Holder.factory
+            @placeholders.factory
             def amount(self, root):
                 return 100
 
-            @Holder.factory
+            @placeholders.factory
             def quantity(self, root):
                 return 1
 
-            @Holder.factory
+            @placeholders.factory
             def order(self, root):
                 customer = root.users.customer
                 created_by = root.users.user
@@ -136,7 +136,7 @@ Example - fixture factory for tests
                     amount=amount, quantity=quantity
                 )
 
-            @Holder.factory
+            @placeholders.factory
             def shipped_order(self, root):
                 order = self.order
                 order.mark_shipped()
