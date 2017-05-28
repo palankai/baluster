@@ -1,6 +1,6 @@
 from inspect import isclass
 
-from .manager import Manager
+from .manager import Manager, AsyncManager
 from .state import State
 from .mediator import Mediator
 from .makers import BaseMaker
@@ -35,27 +35,6 @@ class BaseBaluster:
 
     def __contains__(self, name):
         return self._state.has_data(name)
-
-    def enter(self):
-        return Manager(self.__class__(self._state.new_child()))
-
-    def close(self):
-        handlers = self._state.get_close_handlers()
-        with capture_exceptions() as capture:
-            for key, handler, resource in handlers:
-                instance = find_instance(self, key)
-                with capture():
-                    handler(instance, self, resource)
-            self._state.clear_close_handlers()
-
-    async def aclose(self):
-        handlers = self._state.get_close_handlers()
-        with capture_exceptions() as capture:
-            for key, handler, resource in handlers:
-                instance = find_instance(self, key)
-                with capture():
-                    await as_async(handler, instance, self, resource)
-            self._state.clear_close_handlers()
 
 
 class BalusterType(type):
@@ -103,3 +82,30 @@ class Baluster(BaseBaluster, metaclass=BalusterType):
 
     def inject_config(self, binder):
         self._state.map_inject_providers(binder.bind_to_provider)
+
+    def enter(self):
+        return Manager(self.__class__(self._state.new_child()))
+
+    def close(self):
+        handlers = self._state.get_close_handlers()
+        with capture_exceptions() as capture:
+            for key, handler, resource in handlers:
+                instance = find_instance(self, key)
+                with capture():
+                    handler(instance, self, resource)
+            self._state.clear_close_handlers()
+
+
+class AsyncBaluster(Baluster):
+
+    def enter(self):
+        return AsyncManager(self.__class__(self._state.new_child()))
+
+    async def aclose(self):
+        handlers = self._state.get_close_handlers()
+        with capture_exceptions() as capture:
+            for key, handler, resource in handlers:
+                instance = find_instance(self, key)
+                with capture():
+                    await as_async(handler, instance, self, resource)
+            self._state.clear_close_handlers()

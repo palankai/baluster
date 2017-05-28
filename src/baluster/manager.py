@@ -19,6 +19,11 @@ class Manager:
         self._active = False
         self._managed.close()
 
+
+class AsyncManager(Manager):
+
+    __slots__ = ()
+
     async def __aenter__(self):
         return self._managed
 
