@@ -1,5 +1,5 @@
 import pytest
-from baluster import Holder
+from baluster import AsyncBaluster, placeholders
 
 
 class SampleAsyncConnection:
@@ -50,37 +50,37 @@ class SampleSyncConnection:
         return self
 
 
-class SampleAsync(Holder):
+class SampleAsync(AsyncBaluster):
 
     _closed_resources = None
 
-    @Holder.factory
+    @placeholders.factory
     def async_connection(self, root):
         return SampleAsyncConnection()
 
-    @Holder.factory
+    @placeholders.factory
     def sync_connection(self, root):
         return SampleSyncConnection()
 
-    @Holder.factory
+    @placeholders.factory
     async def async_connect(self, root):
         conn = root.async_connection
         await conn.connect()
         return conn
 
-    @Holder.factory(cache=False)
+    @placeholders.factory(cache=False)
     async def async_fetch_some(self, root):
         conn = root.async_connection
         result = await conn.fetch_some()
         return result
 
-    @Holder.factory
+    @placeholders.factory
     def sync_connect(self, root):
         conn = root.sync_connection
         conn.connect()
         return conn
 
-    @Holder.factory
+    @placeholders.factory
     def resource(self, root):
         return 'sync'
 
@@ -90,7 +90,7 @@ class SampleAsync(Holder):
             self._closed_resources = []
         self._closed_resources.append(resource)
 
-    @Holder.factory(cache=False)
+    @placeholders.factory(cache=False)
     async def async_resource(self, root):
         return 'async'
 
@@ -102,6 +102,9 @@ class SampleAsync(Holder):
 
 
 class TestAsync:
+
+    def test_class_level_access(self):
+        assert SampleAsync.async_resource._name == 'async_resource'
 
     @pytest.mark.asyncio
     async def test_top_level_access(self):

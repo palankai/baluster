@@ -1,33 +1,37 @@
 import pytest
 
-from baluster import Holder
+from baluster import Baluster, placeholders
 
 
-class CompositeRootCase(Holder):
+class CompositeRootCase(Baluster):
 
     _value = 0
     _closed = False
 
     _closed_resources = None
 
-    @Holder.factory
+    place = placeholders.value()
+    place_with_default = placeholders.value(1)
+    place_with_callable = placeholders.value(lambda: 1)
+
+    @placeholders.factory
     def value(self, root):
         return self._value
 
-    @Holder.factory
+    @placeholders.factory
     def value_plus_100(self, root):
         return self._value + 100
 
-    @Holder.factory(cache=False)
+    @placeholders.factory(cache=False)
     def value_no_cache(self, root):
         self._value += 1
         return self._value
 
-    @Holder.factory(readonly=True)
+    @placeholders.factory(readonly=True)
     def value_readonly(self, root):
         return self._value
 
-    @Holder.factory
+    @placeholders.factory
     def resource_1(self, root):
         return 1
 
@@ -37,7 +41,7 @@ class CompositeRootCase(Holder):
             self._closed_resources = []
         self._closed_resources.append(resource)
 
-    @Holder.factory(cache=False)
+    @placeholders.factory(cache=False)
     def resource_2(self, root):
         return 2
 
@@ -48,7 +52,33 @@ class CompositeRootCase(Holder):
         self._closed_resources.append(resource)
 
 
-class TestHolder:
+class TestPlaceholder:
+
+    def test_getter(self):
+        root = CompositeRootCase()
+
+        with pytest.raises(AttributeError):
+            assert root.place is None
+        root.place = 'New value'
+
+        assert root.place == 'New value'
+
+        assert root.place_with_default == 1
+        assert root.place_with_callable == 1
+
+    def test_class_level_access(self):
+        assert CompositeRootCase.place._name == 'place'
+
+    def test_set_new_value(self):
+        root = CompositeRootCase()
+
+        root.place = 'New value'
+
+        with pytest.raises(AttributeError):
+            root.place = 'Other value'
+
+
+class TestBaluster:
 
     def test_sanity(self):
         obj = CompositeRootCase()

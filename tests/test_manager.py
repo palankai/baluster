@@ -1,6 +1,6 @@
 import pytest
 
-from baluster import Holder, ContextManagerReusedError
+from baluster import Baluster, ContextManagerReusedError, placeholders
 
 
 class Resource:
@@ -17,24 +17,24 @@ class Resource:
         self.connected = False
 
 
-class CompositeRoot(Holder):
+class CompositeRoot(Baluster):
 
-    class params(Holder):
+    class params(Baluster):
 
-        @Holder.factory(args=['root', 'env'])
+        @placeholders.factory(args=['root', 'env'])
         def debug(self, root, env):
             if env is None:
                 return None
             return env.get('DEBUG', False)
 
-    @Holder.factory(cache=False)
+    @placeholders.factory(cache=False)
     def param_access(self, root):
         if root.params.debug:
             return 'debug'
         else:
             return 'production'
 
-    @Holder.factory
+    @placeholders.factory
     def resource(self, root):
         res = Resource()
         return res
@@ -43,7 +43,7 @@ class CompositeRoot(Holder):
     def close_resource(self, root, resource):
         resource.disconnect()
 
-    @Holder.factory
+    @placeholders.factory
     def resource_invalidated(self, root):
         res = Resource()
         return res
@@ -54,7 +54,7 @@ class CompositeRoot(Holder):
         assert root.resource_invalidated.connected is True
         resource.disconnect()
 
-    @Holder.factory
+    @placeholders.factory
     def value(self, root):
         return 'initial value'
 

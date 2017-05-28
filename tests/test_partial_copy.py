@@ -1,27 +1,27 @@
-from baluster import Holder
+from baluster import Baluster, placeholders
 
 
-class Root(Holder):
+class Root(Baluster):
 
     def __init__(self, *args, **kwargs):
         self._called = []
         super().__init__(*args, **kwargs)
 
-    class foo(Holder):
+    class foo(Baluster):
 
-        @Holder.factory
+        @placeholders.factory
         def foo(self, root):
             root._called.append('foo.foo')
             return 1
 
-        @Holder.factory
+        @placeholders.factory
         def bar(self, root):
             root._called.append('foo.bar')
             return 1
 
-    class foobar(Holder):
+    class foobar(Baluster):
 
-        @Holder.factory
+        @placeholders.factory
         def bar(self, root):
             root._called.append('foobar.bar')
             return 1

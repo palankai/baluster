@@ -3,6 +3,8 @@ from .exceptions import ContextManagerReusedError
 
 class Manager:
 
+    __slots__ = ('_managed', '_active')
+
     def __init__(self, managed):
         self._managed = managed
         self._active = False
@@ -16,6 +18,11 @@ class Manager:
     def __exit__(self, exc_type, exc_value, traceback):
         self._active = False
         self._managed.close()
+
+
+class AsyncManager(Manager):
+
+    __slots__ = ()
 
     async def __aenter__(self):
         return self._managed

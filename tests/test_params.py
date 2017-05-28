@@ -1,17 +1,17 @@
-from baluster import Holder
+from baluster import Baluster, placeholders
 
 
-class CompositeRoot(Holder):
+class CompositeRoot(Baluster):
 
-    class params(Holder):
+    class params(Baluster):
 
-        @Holder.factory(args=['root', 'env'])
+        @placeholders.factory(args=['root', 'env'])
         def debug(self, root, env):
             if env is None:
                 return None
             return env.get('DEBUG', False)
 
-    @Holder.factory(cache=False)
+    @placeholders.factory(cache=False)
     def resource(self, root):
         if root.params.debug:
             return 'debug'
