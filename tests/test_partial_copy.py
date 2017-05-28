@@ -1,13 +1,13 @@
-from baluster import Holder, placeholders
+from baluster import Baluster, placeholders
 
 
-class Root(Holder):
+class Root(Baluster):
 
     def __init__(self, *args, **kwargs):
         self._called = []
         super().__init__(*args, **kwargs)
 
-    class foo(Holder):
+    class foo(Baluster):
 
         @placeholders.factory
         def foo(self, root):
@@ -19,7 +19,7 @@ class Root(Holder):
             root._called.append('foo.bar')
             return 1
 
-    class foobar(Holder):
+    class foobar(Baluster):
 
         @placeholders.factory
         def bar(self, root):

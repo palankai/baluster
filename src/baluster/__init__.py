@@ -1,3 +1,3 @@
-from .base import Holder                                               # noqa
+from .baluster import Baluster                                         # noqa
 from .exceptions import MultipleExceptions, ContextManagerReusedError  # noqa
 from . import placeholders                                             # noqa

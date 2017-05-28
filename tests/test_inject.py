@@ -1,9 +1,9 @@
 import pytest
 
-from baluster import Holder, placeholders
+from baluster import Baluster, placeholders
 
 
-class CompositeRoot(Holder):
+class CompositeRoot(Baluster):
 
     _counter = 0
 
@@ -22,9 +22,9 @@ class CompositeRoot(Holder):
         self._counter += 1
         return self._counter * 5
 
-    class level1(Holder):
+    class level1(Baluster):
 
-        class level2(Holder):
+        class level2(Baluster):
 
             @placeholders.factory(cache=False, inject='deep_resource')
             def resource(self, root):

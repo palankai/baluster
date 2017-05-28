@@ -1,5 +1,5 @@
 import pytest
-from baluster import Holder, placeholders
+from baluster import Baluster, placeholders
 
 
 class SampleAsyncConnection:
@@ -50,7 +50,7 @@ class SampleSyncConnection:
         return self
 
 
-class SampleAsync(Holder):
+class SampleAsync(Baluster):
 
     _closed_resources = None
 

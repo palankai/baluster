@@ -1,9 +1,9 @@
 import pytest
 
-from baluster import Holder, placeholders
+from baluster import Baluster, placeholders
 
 
-class CompositeRootCase(Holder):
+class CompositeRootCase(Baluster):
 
     _value = 0
     _closed = False
@@ -78,7 +78,7 @@ class TestPlaceholder:
             root.place = 'Other value'
 
 
-class TestHolder:
+class TestBaluster:
 
     def test_sanity(self):
         obj = CompositeRootCase()

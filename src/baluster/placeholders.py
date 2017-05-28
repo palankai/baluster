@@ -1,4 +1,4 @@
-from .base import ValueMaker, FactoryMaker
+from .makers import ValueMaker, FactoryMaker
 
 
 def value(*args, **kwargs):

@@ -1,6 +1,6 @@
 import pytest
 
-from baluster import Holder, ContextManagerReusedError, placeholders
+from baluster import Baluster, ContextManagerReusedError, placeholders
 
 
 class Resource:
@@ -17,9 +17,9 @@ class Resource:
         self.connected = False
 
 
-class CompositeRoot(Holder):
+class CompositeRoot(Baluster):
 
-    class params(Holder):
+    class params(Baluster):
 
         @placeholders.factory(args=['root', 'env'])
         def debug(self, root, env):

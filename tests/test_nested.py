@@ -1,13 +1,13 @@
-from baluster import Holder, placeholders
+from baluster import Baluster, placeholders
 
 
-class CompositeRoot(Holder):
+class CompositeRoot(Baluster):
 
     @placeholders.factory
     def value(self, root):
         return 2
 
-    class subns(Holder):
+    class subns(Baluster):
 
         _closed = False
 
@@ -19,7 +19,7 @@ class CompositeRoot(Holder):
         def close_value(self, root, resource):
             self._closed = True
 
-    class subns_2(Holder):
+    class subns_2(Baluster):
 
         @placeholders.factory
         def value(self, root):

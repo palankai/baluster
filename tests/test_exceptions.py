@@ -1,9 +1,9 @@
 import pytest
 
-from baluster import Holder, MultipleExceptions, placeholders
+from baluster import Baluster, MultipleExceptions, placeholders
 
 
-class CompositeRoot(Holder):
+class CompositeRoot(Baluster):
 
     resource_closed = False
     async_resource_closed = False

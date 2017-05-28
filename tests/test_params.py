@@ -1,9 +1,9 @@
-from baluster import Holder, placeholders
+from baluster import Baluster, placeholders
 
 
-class CompositeRoot(Holder):
+class CompositeRoot(Baluster):
 
-    class params(Holder):
+    class params(Baluster):
 
         @placeholders.factory(args=['root', 'env'])
         def debug(self, root, env):

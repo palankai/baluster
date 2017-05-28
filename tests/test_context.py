@@ -1,9 +1,9 @@
 import pytest
 
-from baluster import Holder
+from baluster import Baluster
 
 
-class Root(Holder):
+class Root(Baluster):
     pass
 
 
