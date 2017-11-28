@@ -44,6 +44,12 @@ class BalusterType(type):
         nested = []
         members = dict()
 
+        for base in bases:
+            if hasattr(base, '_makers'):
+                makers += base._makers
+            if hasattr(base, '_nested'):
+                nested += base._nested
+
         for k, v in defined_members.items():
             if isinstance(v, BaseMaker):
                 makers.append(v)

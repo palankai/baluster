@@ -194,6 +194,12 @@ This installs the package in development mode (`setup.py develop`)
 and the testing packages.
 I would like to achive nearly 100% test coverage.
 
+Test
+~~~~
+.. code::
+
+   pytest
+
 
 Contribution
 ------------
