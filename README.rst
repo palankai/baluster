@@ -200,6 +200,17 @@ Test
 
    pytest
 
+Publish to PyPi
+~~~~~~~~~~~~~~~
+
+Make sure the version number is set correctly in `setup.py`.
+
+.. code::
+
+   python setup.py sdist
+
+   twine upload dist/Baluster-<version-number>.tar.gz
+
 
 Contribution
 ------------
